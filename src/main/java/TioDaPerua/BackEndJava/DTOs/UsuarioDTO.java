@@ -8,7 +8,10 @@ import java.io.Serializable;
 public record UsuarioDTO(
         Long id,
         String email,
-        String senha
+        String senha,
+        String endereco,
+        String telefone,
+        String tipoPerfil
 ) implements Serializable {
 
     @Serial
@@ -17,12 +20,12 @@ public record UsuarioDTO(
 
     public static UsuarioDTO toDTO(Usuario usuario) {
         if (usuario == null) return null;
-        return new UsuarioDTO(usuario.getId(), usuario.getEmail(),null);
+        return new UsuarioDTO(usuario.getId(), usuario.getEmail(),null, usuario.getEndereco(), usuario.getTelefone(), usuario.getTipoPerfil());
     }
 
     public static Usuario toEntity(UsuarioDTO dto) {
         if (dto == null) return null;
-        return new Usuario(dto.email, dto.senha);
+        return new Usuario(dto.email, dto.senha, dto.endereco, dto.telefone, dto.tipoPerfil);
     }
 
 }
