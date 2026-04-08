@@ -29,4 +29,4 @@ jobs:
           push: true
           # IMPORTANTE: Mude o nome abaixo para cada repositório
           # Ex: no front, use ".../frontend:latest"
-          tags: ghcr.io/${{ github.repository }}/backend:latest
+          tags: ghcr.io/grigs2/backendjava/backend:latest
