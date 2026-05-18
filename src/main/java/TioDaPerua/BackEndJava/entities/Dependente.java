@@ -49,6 +49,9 @@ public class Dependente implements Serializable {
 
 
     // Escola
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "escola_id")
+    private Escola escola;
 
     //List<Viagem>
 

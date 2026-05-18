@@ -1,13 +1,18 @@
 package TioDaPerua.BackEndJava.entities;
 
+import TioDaPerua.BackEndJava.enums.Periodo;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
 
 @Data
 @Entity
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "viagem", schema = "public")
 public class Viagem implements Serializable {
 
@@ -16,18 +21,15 @@ public class Viagem implements Serializable {
 
     @Id
     @SequenceGenerator(name="SEQ_viagem", sequenceName = "public.seq_viagem", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Viagem")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_viagem")
     private Long id;
 
-    //List<Escola>
-    //List<Dependentes>
-    //List<Solitacao>
-    //Motorista
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "motorista_id")
+    private Motorista motorista;
 
-
-    @Column
-    private String periodo;
-
-
+    @Enumerated(EnumType.STRING)
+    @Column(name = "periodo")
+    private Periodo periodo;
 
 }

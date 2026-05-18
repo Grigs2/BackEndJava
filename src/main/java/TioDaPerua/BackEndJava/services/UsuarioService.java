@@ -1,8 +1,10 @@
 package TioDaPerua.BackEndJava.services;
 
+import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.entities.Responsavel;
 import TioDaPerua.BackEndJava.entities.Usuario;
+import TioDaPerua.BackEndJava.repositories.EscolaRepository;
 import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
@@ -20,6 +22,9 @@ public class UsuarioService {
 
     @Autowired
     private ResponsavelRepository responsavelRepository;
+
+    @Autowired
+    private EscolaRepository escolaRepository;
 
     public Usuario findByID(Long Id) {
         return usuarioRepository.findById(Id).orElse(null);
@@ -57,6 +62,14 @@ public class UsuarioService {
         if (usuario == null) return null;
         if ("RESPONSAVEL".equals(usuario.getTipoPerfil())) {
             return responsavelRepository.findByUsuarioId(usuario.getId()).orElse(null);
+        }
+        return null;
+    }
+
+    public Escola logarEscola(Usuario usuario) {
+        if (usuario == null) return null;
+        if ("ESCOLA".equals(usuario.getTipoPerfil())) {
+            return escolaRepository.findByUsuarioId(usuario.getId()).orElse(null);
         }
         return null;
     }

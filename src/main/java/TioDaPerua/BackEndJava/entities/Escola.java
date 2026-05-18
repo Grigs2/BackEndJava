@@ -27,7 +27,7 @@ public class Escola implements Serializable  {
     // List<Dependentes>
 
     // Perfil
-
-
-
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
 }

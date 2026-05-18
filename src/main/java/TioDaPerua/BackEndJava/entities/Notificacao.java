@@ -31,7 +31,12 @@ public class Notificacao implements Serializable {
     @Column
     private Boolean visto;
 
-    //Rementente Usuario
-    //Destinatario Usuario
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "remetente_id")
+    private Usuario remetente;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destinatario_id")
+    private Usuario destinatario;
 
 }
