@@ -11,13 +11,21 @@ public record DependenteDTO(Long id,
                             String cpf,
                             LocalDate dataNascimento,
                             String periodo,
-                            String endereco) {
+                            String endereco,
+                            EscolaResumoDTO escola,
+                            String senha) {
 
 
     public static DependenteDTO toDTO(Dependente dependente) {
         if (dependente == null) { return null; }
+        
+        EscolaResumoDTO escolaDTO = null;
+        if (dependente.getEscola() != null) {
+            escolaDTO = new EscolaResumoDTO(dependente.getEscola().getId(), dependente.getEscola().getNome());
+        }
+
         return new DependenteDTO(dependente.getId(), dependente.getNome(), dependente.getCpf(), dependente.getDataNascimento()
-        , dependente.getPeriodo(), dependente.getEndereco());
+        , dependente.getPeriodo(), dependente.getEndereco(), escolaDTO, null);
     }
 
     public static Dependente toEntity(DependenteDTO dto) {

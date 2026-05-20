@@ -37,5 +37,8 @@ public class Veiculo implements Serializable {
     @Column
     public int capacidade;
 
+    @Column
+    public String cor;
+
 
 }
