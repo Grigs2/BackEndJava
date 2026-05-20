@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ViagemService {
@@ -30,6 +31,58 @@ public class ViagemService {
 
     @Autowired
     private ViagemPresencaRepository viagemPresencaRepository;
+
+    @Autowired
+    private SolicitacaoRepository solicitacaoRepository;
+
+    public List<Viagem> listarViagensAtivas(Long idMotorista) {
+        return viagemRepository.findAtivasByMotoristaId(idMotorista);
+    }
+
+    public List<ViagemDiaDTO> historicoViagens(Long idMotorista) {
+        return viagemDiaRepository.findByMotoristaId(idMotorista).stream()
+                .map(ViagemDiaDTO::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public int desativarViagem(Long idViagem) {
+        Optional<Viagem> viagemOpt = viagemRepository.findById(idViagem);
+        if (viagemOpt.isEmpty()) return 404;
+
+        Viagem viagem = viagemOpt.get();
+        if (!viagem.getAtivo()) return 409;
+
+        viagem.setAtivo(false);
+        viagemRepository.save(viagem);
+
+        viagemDependenteRepository.desativarPorViagemId(idViagem);
+        solicitacaoRepository.encerrarPorViagemId(idViagem, LocalDateTime.now());
+
+        return 200;
+    }
+
+    public MotoristaViagemDTO consultarMotorista(Long idViagemDia) {
+        Optional<ViagemDia> vdOpt = viagemDiaRepository.findById(idViagemDia);
+        if (vdOpt.isEmpty()) return null;
+
+        Viagem viagem = vdOpt.get().getViagem();
+        if (viagem == null) return null;
+
+        Motorista motorista = viagem.getMotorista();
+        if (motorista == null) return null;
+
+        Veiculo veiculo = motorista.getVeiculo();
+
+        return new MotoristaViagemDTO(
+                motorista.getId(),
+                motorista.getNome(),
+                motorista.getUsuario() != null ? motorista.getUsuario().getTelefone() : null,
+                veiculo != null ? veiculo.getModelo() : null,
+                veiculo != null ? veiculo.getPlaca() : null,
+                veiculo != null ? veiculo.getCor() : "N/A"
+        );
+    }
 
     public List<ParadaDTO> gerarParadasViagemDia(Long idViagemDia) {
         Optional<ViagemDia> viagemDiaOpt = viagemDiaRepository.findById(idViagemDia);
@@ -244,6 +297,12 @@ public class ViagemService {
 
     public Viagem buscarViagem(Long idViagem) {
         return viagemRepository.findById(idViagem).orElse(null);
+    }
+
+    public ViagemDiaDTO visualizarViagemDia(Long idViagemDia) {
+        return viagemDiaRepository.findById(idViagemDia)
+                .map(ViagemDiaDTO::toDTO)
+                .orElseThrow(() -> new RuntimeException("ViagemDia não encontrada"));
     }
 
     public List<ViagemDependente> buscarVinculados(Long idViagem) {

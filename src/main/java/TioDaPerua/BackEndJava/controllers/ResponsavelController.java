@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import TioDaPerua.BackEndJava.services.DependenteService;
+
 @RestController
 @RequestMapping("/Responsavel")
 public class ResponsavelController {
@@ -31,6 +35,42 @@ public class ResponsavelController {
     @Autowired
     private EscolaService escolaService;
 
+    @Autowired
+    private DependenteService dependenteService;
+
+    @PutMapping("/AlterarInfos")
+    public ResponseEntity<ResponsavelDTO> AlterarInfos(@RequestBody ResponsavelDTO dto) {
+        if (dto == null || dto.usuario() == null || dto.usuario().senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!usuarioService.verificarSenha(dto.usuario().id(), dto.usuario().senha())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Responsavel atualizado = responsavelService.alterarInfos(ResponsavelDTO.toEntity(dto));
+        if (atualizado == null) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(ResponsavelDTO.toDTO(atualizado));
+    }
+
+    @PutMapping("/Dependente/AlterarInfos")
+    public ResponseEntity<DependenteDTO> AlterarDependenteInfos(@RequestBody DependenteDTO dto) {
+        if (dto == null || dto.senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            Dependente atualizado = dependenteService.alterarInfos(DependenteDTO.toEntity(dto), dto.senha());
+            if (atualizado == null) return ResponseEntity.notFound().build();
+            return ResponseEntity.ok(DependenteDTO.toDTO(atualizado));
+        } catch (RuntimeException e) {
+            if ("SENHA_INVALIDA".equals(e.getMessage())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     @PostMapping("/Cadastrar")
     public ResponsavelDTO cadastrar(@RequestBody ResponsavelDTO dto) {
@@ -39,7 +79,7 @@ public class ResponsavelController {
         return ResponsavelDTO.toDTO(responsavelService.cadastrarResponsavel(entity));
     }
 
-    @GetMapping("/Autenticar")
+    @PostMapping("/Autenticar")
     public ResponsavelDTO autenticar(@RequestBody UsuarioDTO dto){
         if (dto == null && dto.email() == null && dto.senha() == null) return null;
         if (dto.email().isEmpty() && dto.senha().isEmpty()) return null;
@@ -69,10 +109,11 @@ public class ResponsavelController {
         if (dependente == null) return null;
 
         List<ViagemPresenca> historico = responsavelService.buscarHistoricoDependente(id_dependente);
+        ViagemPresenca statusAtualEntity = responsavelService.buscarStatusAtualDependente(id_dependente);
         
         ViagemPresencaDTO statusAtual = null;
-        if (!historico.isEmpty()) {
-            statusAtual = ViagemPresencaDTO.toDTO(historico.get(0));
+        if (statusAtualEntity != null) {
+            statusAtual = ViagemPresencaDTO.toDTO(statusAtualEntity);
         }
 
         List<ViagemPresencaDTO> historicoDTO = historico.stream()
@@ -117,10 +158,10 @@ public class ResponsavelController {
                 .collect(Collectors.toList());
     }
 
-    @PutMapping("/EncerrarVinculoViagem")
-    public SolicitacaoDTO encerrarVinculoViagem(@RequestBody EncerrarVinculoViagemDTO dto) {
-        if (dto == null) return null;
-        return SolicitacaoDTO.toDTO(responsavelService.encerrarVinculoViagem(dto.idSolicitacao()));
+    @PutMapping("/EncerrarVinculoViagem/{idSolicitacao}")
+    public SolicitacaoDTO encerrarVinculoViagem(@PathVariable Long idSolicitacao) {
+        if (idSolicitacao == null) return null;
+        return SolicitacaoDTO.toDTO(responsavelService.encerrarVinculoViagem(idSolicitacao));
     }
 
 }

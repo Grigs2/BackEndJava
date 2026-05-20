@@ -9,6 +9,9 @@ import TioDaPerua.BackEndJava.services.UsuarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+
 @RestController
 @RequestMapping("/Escola")
 public class EscolaController {
@@ -18,6 +21,22 @@ public class EscolaController {
 
     @Autowired
     private UsuarioService usuarioService;
+
+    @PutMapping("/AlterarInfos")
+    public ResponseEntity<EscolaDTO> AlterarInfos(@RequestBody EscolaDTO dto) {
+        if (dto == null || dto.usuarioDTO() == null || dto.usuarioDTO().senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!usuarioService.verificarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Escola atualizada = escolaService.alterarInfos(EscolaDTO.toEntity(dto));
+        if (atualizada == null) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(EscolaDTO.toDTO(atualizada));
+    }
 
     @PostMapping("/Cadastrar")
     public EscolaDTO cadastrar(@RequestBody EscolaDTO dto) {

@@ -9,7 +9,8 @@ public record VeiculoDTO(Long id,
                          String modelo,
                          String placa,
                          int ano,
-                         int capacidade) implements Serializable {
+                         int capacidade,
+                         String cor) implements Serializable {
 
 
     @Serial
@@ -17,11 +18,11 @@ public record VeiculoDTO(Long id,
 
     public static VeiculoDTO toDTO(Veiculo veiculo) {
         if (veiculo == null) return null;
-        return new VeiculoDTO(veiculo.getId(), veiculo.getModelo(), veiculo.getPlaca(), veiculo.getAno(), veiculo.getCapacidade());
+        return new VeiculoDTO(veiculo.getId(), veiculo.getModelo(), veiculo.getPlaca(), veiculo.getAno(), veiculo.getCapacidade(), veiculo.getCor());
     }
 
     public static Veiculo toEntity(VeiculoDTO dto) {
         if (dto == null) return null;
-        return new Veiculo(dto.id(), dto.modelo(), dto.placa(), dto.ano(), dto.capacidade());
+        return new Veiculo(dto.id(), dto.modelo(), dto.placa(), dto.ano(), dto.capacidade(), dto.cor());
     }
 }

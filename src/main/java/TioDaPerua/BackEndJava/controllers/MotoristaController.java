@@ -10,6 +10,9 @@ import TioDaPerua.BackEndJava.services.UsuarioService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+
 @RestController
 @RequestMapping("/Motorista")
 public class MotoristaController {
@@ -19,6 +22,22 @@ public class MotoristaController {
 
     @Autowired
     private UsuarioService usuarioService;
+
+    @PutMapping("/AlterarInfos")
+    public ResponseEntity<MotoristaDTO> AlterarInfos(@RequestBody MotoristaDTO dto) {
+        if (dto == null || dto.usuarioDTO() == null || dto.usuarioDTO().senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!usuarioService.verificarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Motorista atualizado = motoristaService.alterarInfos(MotoristaDTO.toEntity(dto));
+        if (atualizado == null) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(MotoristaDTO.toDTO(atualizado));
+    }
 
     @PostMapping("/Cadastrar")
     public MotoristaDTO Cadastrar(@RequestBody MotoristaDTO dto) {
@@ -35,7 +54,7 @@ public class MotoristaController {
         return MotoristaDTO.toDTO(motoristaService.cadastrarVeiculo(id_motorista, VeiculoDTO.toEntity(dto)));
     }
 
-    @GetMapping("/Autenticar")
+    @PostMapping("/Autenticar")
     public MotoristaDTO autenticar(@RequestBody UsuarioDTO dto){
         if (dto == null && dto.email() == null && dto.senha() == null) return null;
         if (dto.email().isEmpty() && dto.senha().isEmpty()) return null;

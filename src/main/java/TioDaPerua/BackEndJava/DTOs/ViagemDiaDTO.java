@@ -4,7 +4,7 @@ import TioDaPerua.BackEndJava.entities.ViagemDia;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public record ViagemDiaDTO(
+public record   ViagemDiaDTO(
     Long id,
     LocalDate data,
     String status,

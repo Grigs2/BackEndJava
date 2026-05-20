@@ -5,14 +5,16 @@ import TioDaPerua.BackEndJava.enums.Periodo;
 
 public record ViagemDTO(Long id,
                        Long motoristaId,
-                       String periodo) {
+                       String periodo,
+                       Boolean ativo) {
 
     public static ViagemDTO toDTO(Viagem viagem) {
         if (viagem == null) return null;
         return new ViagemDTO(
                 viagem.getId(),
                 viagem.getMotorista() != null ? viagem.getMotorista().getId() : null,
-                viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null
+                viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
+                viagem.getAtivo()
         );
     }
 
@@ -22,6 +24,9 @@ public record ViagemDTO(Long id,
         viagem.setId(dto.id());
         if (dto.periodo() != null) {
             viagem.setPeriodo(Periodo.valueOf(dto.periodo()));
+        }
+        if (dto.ativo() != null) {
+            viagem.setAtivo(dto.ativo());
         }
         return viagem;
     }

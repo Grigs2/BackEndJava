@@ -28,6 +28,11 @@ public interface ViagemDependenteRepository extends JpaRepository<ViagemDependen
 
     @Query("SELECT vd FROM ViagemDependente vd WHERE vd.dependente.id = :dependenteId AND vd.ativo = true")
     List<ViagemDependente> findAtivosByDependenteId(Long dependenteId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE ViagemDependente vd SET vd.ativo = false WHERE vd.viagem.id = :viagemId")
+    void desativarPorViagemId(Long viagemId);
+
     @Query("""
         SELECT vd
         FROM ViagemDependente vd

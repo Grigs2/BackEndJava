@@ -32,4 +32,7 @@ public class Viagem implements Serializable {
     @Column(name = "periodo")
     private Periodo periodo;
 
+    @Column(name = "ativo", nullable = false)
+    private Boolean ativo = true;
+
 }

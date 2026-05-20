@@ -21,7 +21,12 @@ public interface SolicitacaoRepository extends JpaRepository<Solicitacao, Long> 
         SELECT s
         FROM Solicitacao s
         WHERE s.responsavel.id = :idResponsavel
+        AND s.dataFim IS NULL
         ORDER BY s.id DESC
     """)
     List<Solicitacao> findByResponsavelId(Long idResponsavel);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE Solicitacao s SET s.dataFim = :dataFim WHERE s.viagem.id = :viagemId AND s.dataFim IS NULL")
+    void encerrarPorViagemId(Long viagemId, java.time.LocalDateTime dataFim);
 }

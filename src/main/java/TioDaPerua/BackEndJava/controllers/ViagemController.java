@@ -14,6 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.http.ResponseEntity;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/Viagem")
 public class ViagemController {
@@ -29,6 +32,38 @@ public class ViagemController {
         if (id_motorista == null || dto == null) return null;
         Viagem entity = ViagemDTO.toEntity(dto);
         return ViagemDTO.toDTO(viagemService.criarViagem(id_motorista, entity));
+    }
+
+    @GetMapping("/ListarViagens/{idMotorista}")
+    public List<ViagemDTO> ListarViagens(@PathVariable Long idMotorista) {
+        if (idMotorista == null) return new ArrayList<>();
+        return viagemService.listarViagensAtivas(idMotorista).stream()
+                .map(ViagemDTO::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @PutMapping("/DesativarViagem/{idViagem}")
+    public ResponseEntity<?> DesativarViagem(@PathVariable Long idViagem) {
+        if (idViagem == null) return ResponseEntity.badRequest().build();
+        
+        int status = viagemService.desativarViagem(idViagem);
+        
+        if (status == 404) return ResponseEntity.notFound().build();
+        if (status == 409) return ResponseEntity.status(409).body(Map.of("erro", "Viagem já está desativada"));
+        
+        return ResponseEntity.ok(Map.of("mensagem", "Viagem desativada com sucesso"));
+    }
+
+    @GetMapping("/Historico/{idMotorista}")
+    public ResponseEntity<List<ViagemDiaDTO>> Historico(@PathVariable Long idMotorista) {
+        if (idMotorista == null) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(viagemService.historicoViagens(idMotorista));
+    }
+
+    @GetMapping("/ConsultarMotorista/{idViagemDia}")
+    public MotoristaViagemDTO ConsultarMotorista(@PathVariable Long idViagemDia) {
+        if (idViagemDia == null) return null;
+        return viagemService.consultarMotorista(idViagemDia);
     }
 
     @GetMapping("/Visualizar/{id_viagem}")
@@ -61,6 +96,16 @@ public class ViagemController {
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 dependentes
         );
+    }
+
+    @GetMapping("/VisualizarViagemDia/{id_viagemDia}")
+    public ResponseEntity<ViagemDiaDTO> visualizarViagemDia(@PathVariable("id_viagemDia") Long id_viagemDia) {
+        if (id_viagemDia == null) return ResponseEntity.badRequest().build();
+        try {
+            return ResponseEntity.ok(viagemService.visualizarViagemDia(id_viagemDia));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/DependentesDisponiveis/{id_viagem}")

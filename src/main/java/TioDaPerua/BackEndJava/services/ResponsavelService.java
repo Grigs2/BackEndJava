@@ -3,6 +3,7 @@ package TioDaPerua.BackEndJava.services;
 import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.Responsavel;
+import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
 import TioDaPerua.BackEndJava.entities.ViagemDependente;
 import TioDaPerua.BackEndJava.entities.ViagemPresenca;
@@ -12,6 +13,7 @@ import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.SolicitacaoRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemPresencaRepository;
+import TioDaPerua.BackEndJava.enums.StatusViagemDia;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -46,6 +48,16 @@ public class ResponsavelService {
 
     public List<ViagemPresenca> buscarHistoricoDependente(Long idDependente) {
         return viagemPresencaRepository.findHistoricoByDependenteId(idDependente);
+    }
+
+    public ViagemPresenca buscarStatusAtualDependente(Long idDependente) {
+        List<ViagemPresenca> historico = viagemPresencaRepository.findHistoricoByDependenteId(idDependente);
+        if (historico.isEmpty()) return null;
+
+        return historico.stream()
+                .filter(vp -> vp.getViagemDia().getStatus() == StatusViagemDia.EM_ANDAMENTO)
+                .findFirst()
+                .orElse(historico.get(0));
     }
 
     public Responsavel cadastrarResponsavel(Responsavel responsavel) {
@@ -144,5 +156,26 @@ public class ResponsavelService {
         }
 
         return solicitacao;
+    }
+
+    public Responsavel alterarInfos(Responsavel responsavel) {
+        if (responsavel == null || responsavel.getId() == null) return null;
+        Optional<Responsavel> responsavelOpt = responsavelRepository.findById(responsavel.getId());
+        if (responsavelOpt.isEmpty()) return null;
+
+        Responsavel existente = responsavelOpt.get();
+        existente.setNome(responsavel.getNome());
+        existente.setCpf(responsavel.getCpf());
+        existente.setDataNascimento(responsavel.getDataNascimento());
+
+        if (responsavel.getUsuario() != null && existente.getUsuario() != null) {
+            Usuario uExistente = existente.getUsuario();
+            Usuario uNovo = responsavel.getUsuario();
+            uExistente.setEmail(uNovo.getEmail());
+            uExistente.setEndereco(uNovo.getEndereco());
+            uExistente.setTelefone(uNovo.getTelefone());
+        }
+
+        return responsavelRepository.save(existente);
     }
 }
