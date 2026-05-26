@@ -6,12 +6,13 @@ import java.time.LocalDateTime;
 public record NotificacaoDTO(Long id,
                             String titulo,
                             String mensagem,
-                            LocalDateTime data,
+                            LocalDateTime dataCriacao,
                             boolean visto,
+                            UsuarioResumoDTO remetente,
                             Long remetenteId,
                             Long destinatarioId) {
 
-    public static NotificacaoDTO toDTO(Notificacao n) {
+    public static NotificacaoDTO toDTO(Notificacao n, UsuarioResumoDTO remetenteResumo) {
         if (n == null) return null;
         return new NotificacaoDTO(
                 n.getId(),
@@ -19,6 +20,7 @@ public record NotificacaoDTO(Long id,
                 n.getMensagem(),
                 n.getData(),
                 n.getVisto() != null ? n.getVisto() : false,
+                remetenteResumo,
                 n.getRemetente() != null ? n.getRemetente().getId() : null,
                 n.getDestinatario() != null ? n.getDestinatario().getId() : null
         );
@@ -30,7 +32,7 @@ public record NotificacaoDTO(Long id,
         n.setId(dto.id());
         n.setTitulo(dto.titulo());
         n.setMensagem(dto.mensagem());
-        n.setData(dto.data());
+        n.setData(dto.dataCriacao());
         n.setVisto(dto.visto());
         return n;
     }

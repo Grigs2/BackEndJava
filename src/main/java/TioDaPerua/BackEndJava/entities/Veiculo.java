@@ -22,7 +22,7 @@ public class Veiculo implements Serializable {
 
     @Id
     @SequenceGenerator(name="SEQ_veiculo", sequenceName = "public.seq_veiculo", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Veiculo")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_veiculo")
     private Long id;
 
     @Column

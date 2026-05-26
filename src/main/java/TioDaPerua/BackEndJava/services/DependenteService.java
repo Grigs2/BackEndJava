@@ -2,6 +2,9 @@ package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.repositories.DependenteRepository;
+import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
+import TioDaPerua.BackEndJava.exceptions.UnauthorizedException;
+import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,26 +20,23 @@ public class DependenteService {
     private UsuarioService usuarioService;
 
     public Dependente alterarInfos(Dependente dependente, String senha) {
-        if (dependente == null || dependente.getId() == null || senha == null) return null;
+        if (dependente == null || dependente.getId() == null || senha == null) {
+            throw new IllegalArgumentException("Dependente, ID e senha são obrigatórios");
+        }
         
-        Optional<Dependente> dependenteOpt = dependenteRepository.findById(dependente.getId());
-        if (dependenteOpt.isEmpty()) return null;
-
-        Dependente existente = dependenteOpt.get();
+        Dependente existente = dependenteRepository.findById(dependente.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado com id: " + dependente.getId()));
         
         // Validar senha contra o primeiro responsável
-        if (existente.getResponsaveis() == null || existente.getResponsaveis().isEmpty()) return null;
-        var responsavel = existente.getResponsaveis().get(0);
-        if (responsavel.getUsuario() == null) return null;
-        
-        if (!usuarioService.verificarSenha(responsavel.getUsuario().getId(), senha)) {
-            // Senha inválida - usaremos um marcador ou exceção se necessário, 
-            // mas aqui vou retornar null e o controller trata.
-            // Para diferenciar de "não encontrado", talvez seja melhor uma exceção.
-            // Mas seguindo o padrão atual de retornar null... 
-            // Vou lançar uma RuntimeException simples para o controller capturar 401.
-            throw new RuntimeException("SENHA_INVALIDA");
+        if (existente.getResponsaveis() == null || existente.getResponsaveis().isEmpty()) {
+            throw new BusinessException("Dependente não possui responsáveis vinculados");
         }
+        var responsavel = existente.getResponsaveis().get(0);
+        if (responsavel.getUsuario() == null) {
+            throw new BusinessException("Responsável não possui usuário vinculado");
+        }
+        
+        usuarioService.validarSenha(responsavel.getUsuario().getId(), senha);
 
         existente.setNome(dependente.getNome());
         existente.setCpf(dependente.getCpf());

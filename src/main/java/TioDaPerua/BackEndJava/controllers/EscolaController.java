@@ -28,35 +28,34 @@ public class EscolaController {
             return ResponseEntity.badRequest().build();
         }
 
-        if (!usuarioService.verificarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+        usuarioService.validarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha());
 
         Escola atualizada = escolaService.alterarInfos(EscolaDTO.toEntity(dto));
-        if (atualizada == null) return ResponseEntity.notFound().build();
-
         return ResponseEntity.ok(EscolaDTO.toDTO(atualizada));
     }
 
     @PostMapping("/Cadastrar")
-    public EscolaDTO cadastrar(@RequestBody EscolaDTO dto) {
-        if (dto == null || dto.usuarioDTO() == null) return null;
-        if (!"ESCOLA".equals(dto.usuarioDTO().tipoPerfil())) return null;
+    public ResponseEntity<EscolaDTO> cadastrar(@RequestBody EscolaDTO dto) {
+        if (dto == null || dto.usuarioDTO() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!"ESCOLA".equals(dto.usuarioDTO().tipoPerfil())) {
+            return ResponseEntity.badRequest().build();
+        }
 
         Escola escola = EscolaDTO.toEntity(dto);
         Escola escolaSalva = escolaService.cadastrarEscola(escola);
-        return EscolaDTO.toDTO(escolaSalva);
+        return ResponseEntity.status(HttpStatus.CREATED).body(EscolaDTO.toDTO(escolaSalva));
     }
 
     @PostMapping("/Autenticar")
-    public EscolaDTO autenticar(@RequestBody UsuarioDTO dto) {
-        if (dto == null || dto.email() == null || dto.senha() == null) return null;
+    public ResponseEntity<EscolaDTO> autenticar(@RequestBody UsuarioDTO dto) {
+        if (dto == null || dto.email() == null || dto.senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
 
         Usuario usuario = usuarioService.autenticar(dto.email(), dto.senha());
-        if (usuario != null) {
-            Escola escola = usuarioService.logarEscola(usuario);
-            return EscolaDTO.toDTO(escola);
-        }
-        return null;
+        Escola escola = usuarioService.logarEscola(usuario);
+        return ResponseEntity.ok(EscolaDTO.toDTO(escola));
     }
 }

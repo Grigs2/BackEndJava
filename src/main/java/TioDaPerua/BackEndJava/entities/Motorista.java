@@ -23,7 +23,7 @@ public class Motorista implements Serializable {
 
     @Id
     @SequenceGenerator(name="SEQ_motorista", sequenceName = "public.seq_motorista", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Motorista")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_motorista")
     private Long id;
 
     @Column

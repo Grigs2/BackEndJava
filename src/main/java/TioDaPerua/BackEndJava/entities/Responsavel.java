@@ -24,7 +24,7 @@ public class Responsavel implements Serializable {
 
     @Id
     @SequenceGenerator(name="SEQ_responsavel", sequenceName = "public.seq_responsavel", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Responsavel")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_responsavel")
     private Long id;
 
     @Column

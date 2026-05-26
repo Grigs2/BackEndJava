@@ -14,6 +14,9 @@ import TioDaPerua.BackEndJava.repositories.SolicitacaoRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemPresencaRepository;
 import TioDaPerua.BackEndJava.enums.StatusViagemDia;
+import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
+import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -43,7 +46,8 @@ public class ResponsavelService {
     private ViagemDependenteRepository viagemDependenteRepository;
 
     public Dependente buscarDependente(Long idDependente) {
-        return dependenteRepository.findById(idDependente).orElse(null);
+        return dependenteRepository.findById(idDependente)
+                .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado com id: " + idDependente));
     }
 
     public List<ViagemPresenca> buscarHistoricoDependente(Long idDependente) {
@@ -61,81 +65,80 @@ public class ResponsavelService {
     }
 
     public Responsavel cadastrarResponsavel(Responsavel responsavel) {
-        if (responsavel == null) return null;
+        if (responsavel == null) throw new IllegalArgumentException("Responsável não pode ser nulo");
 
         if (responsavel.getId() != null) {
-            Optional<Responsavel> responsavelOpt = responsavelRepository.findById(responsavel.getId());
-            if (responsavelOpt.isPresent()) {
-                Responsavel responsavelExistente = responsavelOpt.get();
-                if (responsavel.getDependentes() != null) {
-                    for (Dependente d : responsavel.getDependentes()) {
-                        if (!responsavelExistente.getDependentes().contains(d)) {
-                            responsavelExistente.getDependentes().add(d);
-                        }
+            Responsavel responsavelExistente = responsavelRepository.findById(responsavel.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + responsavel.getId()));
+
+            if (responsavel.getDependentes() != null) {
+                for (Dependente d : responsavel.getDependentes()) {
+                    if (!responsavelExistente.getDependentes().contains(d)) {
+                        responsavelExistente.getDependentes().add(d);
                     }
                 }
-                return responsavelRepository.save(responsavelExistente);
             }
+            return responsavelRepository.save(responsavelExistente);
         }
         return responsavelRepository.save(responsavel);
     }
 
     public Responsavel cadastrarDependente(Long idResponsavel, Dependente dependente) {
-        if (dependente == null || idResponsavel == null) return null;
+        if (idResponsavel == null || dependente == null) throw new IllegalArgumentException("IDs de responsável e dependente são obrigatórios");
         
-        Optional<Responsavel> responsavelOpt = responsavelRepository.findById(idResponsavel);
-        if (responsavelOpt.isPresent()) {
-            Responsavel responsavelExistente = responsavelOpt.get();
-            if (responsavelExistente.getDependentes() != null) {
-                if (!responsavelExistente.getDependentes().contains(dependente)) {
-                    responsavelExistente.getDependentes().add(dependente);
-                } else {
-                    return null; // Dependente já cadastrado
-                }
-            } else {
-                responsavelExistente.setDependentes(new java.util.ArrayList<>());
+        Responsavel responsavelExistente = responsavelRepository.findById(idResponsavel)
+                .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + idResponsavel));
+
+        if (responsavelExistente.getDependentes() != null) {
+            if (!responsavelExistente.getDependentes().contains(dependente)) {
                 responsavelExistente.getDependentes().add(dependente);
+            } else {
+                throw new ConflictException("Dependente já cadastrado para este responsável");
             }
-            return responsavelRepository.save(responsavelExistente);
+        } else {
+            responsavelExistente.setDependentes(new java.util.ArrayList<>());
+            responsavelExistente.getDependentes().add(dependente);
         }
-        return null;
+        return responsavelRepository.save(responsavelExistente);
     }
 
     public Responsavel vincularEscola(Long idResponsavel, Long idEscola, Long idDependente) {
-        if (idResponsavel == null || idEscola == null || idDependente == null) return null;
-
-        Optional<Responsavel> responsavelOpt = responsavelRepository.findById(idResponsavel);
-        Optional<Escola> escolaOpt = escolaRepository.findById(idEscola);
-
-        if (responsavelOpt.isPresent() && escolaOpt.isPresent()) {
-            Optional<Dependente> dependenteOpt = dependenteRepository.findByIdAndResponsavelId(idDependente, idResponsavel);
-            if (dependenteOpt.isPresent()) {
-                Dependente dependente = dependenteOpt.get();
-                dependente.setEscola(escolaOpt.get());
-                dependenteRepository.save(dependente);
-                return responsavelRepository.findById(idResponsavel).orElse(null);
-            }
+        if (idResponsavel == null || idEscola == null || idDependente == null) {
+            throw new IllegalArgumentException("IDs de responsável, escola e dependente são obrigatórios");
         }
-        return null;
+
+        Responsavel responsavel = responsavelRepository.findById(idResponsavel)
+                .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + idResponsavel));
+        Escola escola = escolaRepository.findById(idEscola)
+                .orElseThrow(() -> new ResourceNotFoundException("Escola não encontrada com id: " + idEscola));
+
+        Dependente dependente = dependenteRepository.findByIdAndResponsavelId(idDependente, idResponsavel)
+                .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado ou não pertence a este responsável"));
+
+        dependente.setEscola(escola);
+        dependenteRepository.save(dependente);
+        return responsavel;
     }
 
     public List<Solicitacao> listarSolicitacoes(Long idResponsavel) {
-        if (idResponsavel == null) return null;
+        if (idResponsavel == null) throw new IllegalArgumentException("ID do responsável é obrigatório");
         return solicitacaoRepository.findByResponsavelId(idResponsavel);
     }
 
     public Solicitacao encerrarVinculoViagem(Long idSolicitacao) {
-        if (idSolicitacao == null) return null;
+        if (idSolicitacao == null) throw new IllegalArgumentException("ID da solicitação é obrigatório");
 
-        Optional<Solicitacao> solicitacaoOpt = solicitacaoRepository.findById(idSolicitacao);
-        if (solicitacaoOpt.isEmpty()) return null;
-
-        Solicitacao solicitacao = solicitacaoOpt.get();
+        Solicitacao solicitacao = solicitacaoRepository.findById(idSolicitacao)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com id: " + idSolicitacao));
 
         // Validar que a solicitação está aceita e respondida (vínculo ativo)
-        if (!solicitacao.isAceito() || !solicitacao.isRespondido()) return null;
+        if (!solicitacao.isAceito() || !solicitacao.isRespondido()) {
+            throw new BusinessException("Apenas solicitações aceitas e respondidas podem ter o vínculo encerrado");
+        }
         // Validar que já não foi encerrada
-        if (solicitacao.getDataFim() != null) return null;
+        if (solicitacao.getDataFim() != null) {
+            throw new ConflictException("Vínculo já encerrado");
+        }
 
         // Atualizar Solicitação
         solicitacao.setDataFim(LocalDateTime.now());
@@ -159,11 +162,11 @@ public class ResponsavelService {
     }
 
     public Responsavel alterarInfos(Responsavel responsavel) {
-        if (responsavel == null || responsavel.getId() == null) return null;
-        Optional<Responsavel> responsavelOpt = responsavelRepository.findById(responsavel.getId());
-        if (responsavelOpt.isEmpty()) return null;
+        if (responsavel == null || responsavel.getId() == null) throw new IllegalArgumentException("ID do responsável é obrigatório");
+        
+        Responsavel existente = responsavelRepository.findById(responsavel.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + responsavel.getId()));
 
-        Responsavel existente = responsavelOpt.get();
         existente.setNome(responsavel.getNome());
         existente.setCpf(responsavel.getCpf());
         existente.setDataNascimento(responsavel.getDataNascimento());

@@ -12,4 +12,7 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
 
     @Query("SELECT n FROM Notificacao n WHERE n.destinatario.id = :usuarioId ORDER BY n.data DESC")
     List<Notificacao> findByDestinatarioId(Long usuarioId);
+
+    @Query("SELECT n FROM Notificacao n WHERE n.destinatario.id = :usuarioId AND n.visto = false ORDER BY n.data DESC")
+    List<Notificacao> findNaoVistasByDestinatarioId(Long usuarioId);
 }

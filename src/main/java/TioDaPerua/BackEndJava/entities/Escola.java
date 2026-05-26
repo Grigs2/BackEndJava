@@ -15,7 +15,7 @@ public class Escola implements Serializable  {
 
     @Id
     @SequenceGenerator(name="SEQ_escola", sequenceName = "public.seq_escola", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Escola")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_escola")
     private Long id;
 
     @Column
