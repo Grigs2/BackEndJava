@@ -430,15 +430,6 @@ A IA DEVE utilizar obrigatoriamente os documentos complementares presentes na pa
 
 Documentos auxiliares:
 
-* `/Docs/IMPLEMENTACAO_GUIADA.md`
-
-  * Contém:
-
-    * plano de implementação
-    * ordem correta dos casos de uso
-    * regras arquiteturais adicionais
-    * responsabilidades por camada
-    * regras de repositories
-    * padrões obrigatórios de implementação
+* `/Docs/`
 
 A IA DEVE considerar TODOS os documentos como parte do mesmo contexto arquitetural do projeto.

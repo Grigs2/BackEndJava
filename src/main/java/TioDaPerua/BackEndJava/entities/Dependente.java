@@ -24,7 +24,7 @@ public class Dependente implements Serializable {
 
     @Id
     @SequenceGenerator(name="SEQ_dependente", sequenceName = "public.seq_dependente", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Dependente")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_dependente")
     private Long id;
 
     @Column

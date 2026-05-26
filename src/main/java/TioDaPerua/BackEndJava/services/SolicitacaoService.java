@@ -5,6 +5,9 @@ import TioDaPerua.BackEndJava.entities.Solicitacao;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.entities.ViagemDependente;
 import TioDaPerua.BackEndJava.repositories.*;
+import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
+import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -32,20 +35,21 @@ public class SolicitacaoService {
     }
 
     public Solicitacao solicitarDependente(Long idViagem, Long idDependente) {
-        Optional<Viagem> viagemOpt = viagemRepository.findById(idViagem);
-        Optional<Dependente> dependenteOpt = dependenteRepository.findById(idDependente);
-
-        if (viagemOpt.isEmpty() || dependenteOpt.isEmpty()) return null;
-
-        Viagem viagem = viagemOpt.get();
-        Dependente dependente = dependenteOpt.get();
+        Viagem viagem = viagemRepository.findById(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
+        Dependente dependente = dependenteRepository.findById(idDependente)
+                .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado com id: " + idDependente));
 
         // Validar dependente possui escola
-        if (dependente.getEscola() == null) return null;
+        if (dependente.getEscola() == null) {
+            throw new BusinessException("Dependente deve estar vinculado a uma escola para solicitar transporte");
+        }
 
         // Validar solicitação ainda não existe
         Optional<Solicitacao> existente = solicitacaoRepository.findPendenteByDependenteAndViagem(idDependente, idViagem);
-        if (existente.isPresent()) return null;
+        if (existente.isPresent()) {
+            throw new ConflictException("Já existe uma solicitação pendente para este dependente nesta viagem");
+        }
 
         // Criar solicitação
         Solicitacao solicitacao = new Solicitacao();
@@ -56,7 +60,7 @@ public class SolicitacaoService {
         if (dependente.getResponsaveis() != null && !dependente.getResponsaveis().isEmpty()) {
             solicitacao.setResponsavel(dependente.getResponsaveis().get(0));
         } else {
-            return null; // Não pode solicitar sem responsável
+            throw new BusinessException("Dependente não possui responsáveis vinculados");
         }
 
         solicitacao.setRespondido(false);
@@ -67,11 +71,12 @@ public class SolicitacaoService {
     }
 
     public Solicitacao responderSolicitacao(Long idSolicitacao, boolean aceito) {
-        Optional<Solicitacao> solicitacaoOpt = solicitacaoRepository.findById(idSolicitacao);
-        if (solicitacaoOpt.isEmpty()) return null;
+        Solicitacao solicitacao = solicitacaoRepository.findById(idSolicitacao)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com id: " + idSolicitacao));
 
-        Solicitacao solicitacao = solicitacaoOpt.get();
-        if (solicitacao.isRespondido()) return null;
+        if (solicitacao.isRespondido()) {
+            throw new ConflictException("Solicitação já foi respondida");
+        }
 
         solicitacao.setRespondido(true);
         solicitacao.setAceito(aceito);

@@ -18,7 +18,7 @@ public class ViagemEscola implements Serializable{
 
     @Id
     @SequenceGenerator(name="SEQ_viagem_escola", sequenceName = "public.seq_viagem_escola", allocationSize=1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_Viagem_Escola")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator= "SEQ_viagem_escola")
     private Long id;
 
     //Escola

@@ -29,43 +29,45 @@ public class MotoristaController {
             return ResponseEntity.badRequest().build();
         }
 
-        if (!usuarioService.verificarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+        usuarioService.validarSenha(dto.usuarioDTO().id(), dto.usuarioDTO().senha());
 
         Motorista atualizado = motoristaService.alterarInfos(MotoristaDTO.toEntity(dto));
-        if (atualizado == null) return ResponseEntity.notFound().build();
-
         return ResponseEntity.ok(MotoristaDTO.toDTO(atualizado));
     }
 
     @PostMapping("/Cadastrar")
-    public MotoristaDTO Cadastrar(@RequestBody MotoristaDTO dto) {
-        if(dto ==null || dto.usuarioDTO()==null) return null;
-        if(!"MOTORISTA".equals(dto.usuarioDTO().tipoPerfil())) return null;
+    public ResponseEntity<MotoristaDTO> Cadastrar(@RequestBody MotoristaDTO dto) {
+        if (dto == null || dto.usuarioDTO() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!"MOTORISTA".equals(dto.usuarioDTO().tipoPerfil())) {
+            return ResponseEntity.badRequest().build();
+        }
 
-        return MotoristaDTO.toDTO(motoristaService.cadastraMotorista(MotoristaDTO.toEntity(dto)));
-
+        Motorista motoristaSalvo = motoristaService.cadastraMotorista(MotoristaDTO.toEntity(dto));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MotoristaDTO.toDTO(motoristaSalvo));
     }
 
     @PostMapping("/CadastrarVeiculo/{id_motorista}")
-    public MotoristaDTO CadastrarVeiculo(@PathVariable Long id_motorista, @RequestBody VeiculoDTO dto) {
-        if (dto == null || id_motorista == null) return null;
-        return MotoristaDTO.toDTO(motoristaService.cadastrarVeiculo(id_motorista, VeiculoDTO.toEntity(dto)));
+    public ResponseEntity<MotoristaDTO> CadastrarVeiculo(@PathVariable Long id_motorista, @RequestBody VeiculoDTO dto) {
+        if (dto == null || id_motorista == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Motorista motoristaComVeiculo = motoristaService.cadastrarVeiculo(id_motorista, VeiculoDTO.toEntity(dto));
+        return ResponseEntity.ok(MotoristaDTO.toDTO(motoristaComVeiculo));
     }
 
     @PostMapping("/Autenticar")
-    public MotoristaDTO autenticar(@RequestBody UsuarioDTO dto){
-        if (dto == null && dto.email() == null && dto.senha() == null) return null;
-        if (dto.email().isEmpty() && dto.senha().isEmpty()) return null;
-
+    public ResponseEntity<MotoristaDTO> autenticar(@RequestBody UsuarioDTO dto) {
+        if (dto == null || dto.email() == null || dto.senha() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (dto.email().isEmpty() || dto.senha().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
 
         Usuario usuarioLogado = usuarioService.autenticar(dto.email(), dto.senha());
-        if (usuarioLogado == null) return null;
-        if("MOTORISTA".equals(usuarioLogado.getTipoPerfil())){
-            return MotoristaDTO.toDTO(usuarioService.logarMotorista(usuarioLogado));
-        }
-        //Perfil nao é motorista
-        return null;
+        Motorista motorista = usuarioService.logarMotorista(usuarioLogado);
+        return ResponseEntity.ok(MotoristaDTO.toDTO(motorista));
     }
 }

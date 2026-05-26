@@ -4,6 +4,9 @@ import TioDaPerua.BackEndJava.DTOs.*;
 import TioDaPerua.BackEndJava.entities.*;
 import TioDaPerua.BackEndJava.enums.*;
 import TioDaPerua.BackEndJava.repositories.*;
+import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
+import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -46,31 +49,30 @@ public class ViagemService {
     }
 
     @Transactional
-    public int desativarViagem(Long idViagem) {
-        Optional<Viagem> viagemOpt = viagemRepository.findById(idViagem);
-        if (viagemOpt.isEmpty()) return 404;
+    public void desativarViagem(Long idViagem) {
+        Viagem viagem = viagemRepository.findById(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
 
-        Viagem viagem = viagemOpt.get();
-        if (!viagem.getAtivo()) return 409;
+        if (!viagem.getAtivo()) {
+            throw new ConflictException("Viagem já está desativada");
+        }
 
         viagem.setAtivo(false);
         viagemRepository.save(viagem);
 
         viagemDependenteRepository.desativarPorViagemId(idViagem);
         solicitacaoRepository.encerrarPorViagemId(idViagem, LocalDateTime.now());
-
-        return 200;
     }
 
     public MotoristaViagemDTO consultarMotorista(Long idViagemDia) {
-        Optional<ViagemDia> vdOpt = viagemDiaRepository.findById(idViagemDia);
-        if (vdOpt.isEmpty()) return null;
+        ViagemDia vd = viagemDiaRepository.findById(idViagemDia)
+                .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
 
-        Viagem viagem = vdOpt.get().getViagem();
-        if (viagem == null) return null;
+        Viagem viagem = vd.getViagem();
+        if (viagem == null) throw new BusinessException("Execução de viagem sem vínculo com itinerário");
 
         Motorista motorista = viagem.getMotorista();
-        if (motorista == null) return null;
+        if (motorista == null) throw new BusinessException("Viagem sem motorista vinculado");
 
         Veiculo veiculo = motorista.getVeiculo();
 
@@ -85,10 +87,9 @@ public class ViagemService {
     }
 
     public List<ParadaDTO> gerarParadasViagemDia(Long idViagemDia) {
-        Optional<ViagemDia> viagemDiaOpt = viagemDiaRepository.findById(idViagemDia);
-        if (viagemDiaOpt.isEmpty()) return new ArrayList<>();
+        ViagemDia viagemDia = viagemDiaRepository.findById(idViagemDia)
+                .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
 
-        ViagemDia viagemDia = viagemDiaOpt.get();
         Viagem viagem = viagemDia.getViagem();
         if (viagem == null) return new ArrayList<>();
 
@@ -99,18 +100,15 @@ public class ViagemService {
         List<ParadaDTO> paradas = new ArrayList<>();
         int ordem = 1;
 
-        // 1. Casa do Motorista (Início)
         paradas.add(criarParadaMotorista(ordem++, viagem.getMotorista(), "Saída: Casa do Motorista"));
 
         if (ida) {
-            // IDA: Motorista -> Responsáveis -> Escolas -> Motorista
             List<ParadaDTO> paradasResp = adicionarParadasResponsaveis(ordem, vinculados, idViagemDia);
             paradas.addAll(paradasResp);
             ordem = paradas.size() + 1;
             List<ParadaDTO> paradasEscola = adicionarParadasEscolas(ordem, vinculados, idViagemDia);
             paradas.addAll(paradasEscola);
         } else {
-            // VOLTA: Motorista -> Escolas -> Responsáveis -> Motorista
             List<ParadaDTO> paradasEscola = adicionarParadasEscolas(ordem, vinculados, idViagemDia);
             paradas.addAll(paradasEscola);
             ordem = paradas.size() + 1;
@@ -119,8 +117,6 @@ public class ViagemService {
         }
 
         ordem = paradas.size() + 1;
-
-        // Casa do Motorista (Fim)
         paradas.add(criarParadaMotorista(ordem, viagem.getMotorista(), "Retorno: Casa do Motorista"));
 
         return paradas;
@@ -193,27 +189,22 @@ public class ViagemService {
     }
 
     public ViagemDia iniciarViagemDia(Long idViagem) {
-        Optional<Viagem> viagemOpt = viagemRepository.findById(idViagem);
-        if (viagemOpt.isEmpty()) return null;
+        Viagem viagem = viagemRepository.findById(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
 
-        Viagem viagem = viagemOpt.get();
         LocalDate hoje = LocalDate.now();
 
-        // Validar se já existe viagem dia para hoje
         Optional<ViagemDia> existente = viagemDiaRepository.findByViagemIdAndData(idViagem, hoje);
         if (existente.isPresent()) return existente.get();
 
-        // Criar ViagemDia
         ViagemDia viagemDia = new ViagemDia();
         viagemDia.setViagem(viagem);
         viagemDia.setData(hoje);
         viagemDia.setStatus(StatusViagemDia.PLANEJADA);
         viagemDia = viagemDiaRepository.save(viagemDia);
 
-        // Buscar dependentes ativos
         List<ViagemDependente> ativos = viagemDependenteRepository.findAtivosByViagemId(idViagem);
 
-        // Criar presenças
         for (ViagemDependente vd : ativos) {
             ViagemPresenca presenca = new ViagemPresenca();
             presenca.setViagemDia(viagemDia);
@@ -226,43 +217,39 @@ public class ViagemService {
     }
 
     public Viagem criarViagem(Long idMotorista, Viagem viagem) {
-        if (viagem == null || idMotorista == null) return null;
+        if (viagem == null || idMotorista == null) throw new IllegalArgumentException("Dados da viagem e motorista são obrigatórios");
 
-        // Validar motorista existente
-        Optional<Motorista> motoristaOpt = motoristaRepository.findById(idMotorista);
-        if (motoristaOpt.isEmpty()) return null;
+        Motorista motorista = motoristaRepository.findById(idMotorista)
+                .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado com id: " + idMotorista));
 
-        Motorista motorista = motoristaOpt.get();
+        if (motorista.getVeiculo() == null) {
+            throw new BusinessException("Motorista deve possuir um veículo cadastrado para criar viagens");
+        }
 
-        // Validar motorista possui veículo
-        if (motorista.getVeiculo() == null) return null;
-
-        // Validar duplicidade: motorista + periodo
         Optional<Viagem> viagemExistente = viagemRepository.findByMotoristaIdAndPeriodo(idMotorista, viagem.getPeriodo());
-        if (viagemExistente.isPresent()) return null;
+        if (viagemExistente.isPresent()) {
+            throw new ConflictException("Motorista já possui uma viagem ativa para este período: " + viagem.getPeriodo());
+        }
 
-        // Configurar entidade
         viagem.setMotorista(motorista);
-
-        // Persistir
         return viagemRepository.save(viagem);
     }
 
     public List<ParadaDTO> alterarStatusPresenca(Long idViagemDia, Long idDependente, String novoStatus) {
-        if (idViagemDia == null || idDependente == null || novoStatus == null) return null;
+        if (idViagemDia == null || idDependente == null || novoStatus == null) {
+            throw new IllegalArgumentException("IDs de viagem, dependente e novo status são obrigatórios");
+        }
 
-        Optional<ViagemPresenca> presencaOpt = viagemPresencaRepository.findByViagemDiaIdAndDependenteId(idViagemDia, idDependente);
-        if (presencaOpt.isEmpty()) return null;
+        ViagemPresenca presenca = viagemPresencaRepository.findByViagemDiaIdAndDependenteId(idViagemDia, idDependente)
+                .orElseThrow(() -> new ResourceNotFoundException("Registro de presença não encontrado"));
 
-        ViagemPresenca presenca = presencaOpt.get();
         StatusViagemPresenca status;
         try {
             status = StatusViagemPresenca.valueOf(novoStatus);
         } catch (IllegalArgumentException e) {
-            return null;
+            throw new BusinessException("Status de presença inválido: " + novoStatus);
         }
 
-        // Regras de transição e timestamps
         if (status == StatusViagemPresenca.EMBARCADO) {
             presenca.setHorarioEmbarque(LocalDateTime.now());
         } else if (status == StatusViagemPresenca.DESEMBARCADO) {
@@ -276,17 +263,16 @@ public class ViagemService {
     }
 
     public ViagemDia alterarStatusViagemDia(Long idViagemDia, String novoStatus) {
-        if (idViagemDia == null || novoStatus == null) return null;
+        if (idViagemDia == null || novoStatus == null) throw new IllegalArgumentException("ID da viagem e novo status são obrigatórios");
 
-        Optional<ViagemDia> viagemDiaOpt = viagemDiaRepository.findById(idViagemDia);
-        if (viagemDiaOpt.isEmpty()) return null;
+        ViagemDia viagemDia = viagemDiaRepository.findById(idViagemDia)
+                .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
 
-        ViagemDia viagemDia = viagemDiaOpt.get();
         StatusViagemDia status;
         try {
             status = StatusViagemDia.valueOf(novoStatus);
         } catch (IllegalArgumentException e) {
-            return null;
+            throw new BusinessException("Status de execução de viagem inválido: " + novoStatus);
         }
 
         viagemDia.setStatus(status);
@@ -296,13 +282,14 @@ public class ViagemService {
     }
 
     public Viagem buscarViagem(Long idViagem) {
-        return viagemRepository.findById(idViagem).orElse(null);
+        return viagemRepository.findById(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
     }
 
     public ViagemDiaDTO visualizarViagemDia(Long idViagemDia) {
         return viagemDiaRepository.findById(idViagemDia)
                 .map(ViagemDiaDTO::toDTO)
-                .orElseThrow(() -> new RuntimeException("ViagemDia não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
     }
 
     public List<ViagemDependente> buscarVinculados(Long idViagem) {
