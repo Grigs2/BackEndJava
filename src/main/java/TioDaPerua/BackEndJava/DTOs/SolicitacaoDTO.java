@@ -5,12 +5,12 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import TioDaPerua.BackEndJava.entities.Solicitacao;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record SolicitacaoDTO(Long id,
-                            @NotBlank(message = "ID da viagem está nullo") Long viagemId,
-                            @NotBlank(message = "ID do dependente está nullo") Long dependenteId,
-                            @NotBlank(message = "ID do responsável está nullo") Long responsavelId,
+                            @NotNull(message = "ID da viagem está nullo") Long viagemId,
+                            @NotNull(message = "ID do dependente está nullo") Long dependenteId,
+                            @NotNull(message = "ID do responsável está nullo") Long responsavelId,
                             boolean respondido,
                             boolean aceito,
                             @JsonFormat(pattern = "yyyy-MM-dd")LocalDateTime dataInicio,

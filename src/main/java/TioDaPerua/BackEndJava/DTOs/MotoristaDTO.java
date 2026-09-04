@@ -10,12 +10,13 @@ import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.validations.CNH;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 
 public record MotoristaDTO(Long id,
                             @NotBlank(message = "Nome está nullo")String nome,
-                            @NotBlank(message = "dataNascimento está nullo")
+                            @NotNull(message = "dataNascimento está nullo")
                                 @Past(message = "A data deve ser no passado.") 
                                 @JsonFormat(pattern = "yyyy-MM-dd")LocalDate dataNascimento,
                             @NotBlank(message = "CPF está nullo")
@@ -24,8 +25,8 @@ public record MotoristaDTO(Long id,
                             @NotBlank(message = "CNH está nullo") 
                                 @Pattern(regexp = "^\\d{11}$", message = "A CNH deve conter exatamente 11 dígitos numéricos.")
                                 @CNH(message = "CNH inválida.") String cnh,
-                            @NotBlank(message = "Usuário está nullo")@Valid UsuarioDTO usuarioDTO,
-                            @NotBlank(message = "Veículo está nullo")@Valid VeiculoDTO veiculoDTO) {
+                            @NotNull(message = "Usuário está nullo")@Valid UsuarioDTO usuarioDTO,
+                            @NotNull(message = "Veículo está nullo")@Valid VeiculoDTO veiculoDTO) {
 
 
     public static MotoristaDTO toDTO(Motorista motorista) {

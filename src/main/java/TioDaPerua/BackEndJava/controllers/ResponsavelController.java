@@ -32,8 +32,10 @@ import TioDaPerua.BackEndJava.services.ResponsavelService;
 import TioDaPerua.BackEndJava.services.SolicitacaoService;
 import TioDaPerua.BackEndJava.services.UsuarioService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @RestController
 @RequestMapping("/Responsavel")
 public class ResponsavelController {
@@ -82,7 +84,7 @@ public class ResponsavelController {
     }
 
     @PostMapping("/CadastrarDependente/{id_Responsavel}")
-    public ResponseEntity<ResponsavelDTO> cadastrarDependente(@NotBlank(message = "ID do responsável está nullo") @PathVariable Long id_Responsavel,
+    public ResponseEntity<ResponsavelDTO> cadastrarDependente(@NotNull(message = "ID do responsável está nullo") @PathVariable Long id_Responsavel,
                                                                                                                   @Valid @RequestBody DependenteDTO dto) {
         Dependente entity = DependenteDTO.toEntity(dto);
         Responsavel responsavel = responsavelService.cadastrarDependente(id_Responsavel, entity);
@@ -90,7 +92,7 @@ public class ResponsavelController {
     }
 
     @GetMapping("/Monitorar/{id_dependente}")
-    public ResponseEntity<MonitoramentoDependenteDTO> Monitorar(@NotBlank(message = "ID do dependente está nullo") @PathVariable Long id_dependente) {
+    public ResponseEntity<MonitoramentoDependenteDTO> Monitorar(@NotNull(message = "ID do dependente está nullo") @PathVariable Long id_dependente) {
         Dependente dependente = responsavelService.buscarDependente(id_dependente);
 
         List<ViagemPresenca> historico = responsavelService.buscarHistoricoDependente(id_dependente);
@@ -114,7 +116,7 @@ public class ResponsavelController {
     }
 
     @PostMapping("/ResponderSolicitacao/{id_solicitacao}")
-    public ResponseEntity<SolicitacaoDTO> ResponderSolicitacao(@NotBlank(message = "ID da solicitacao está nullo") @PathVariable Long id_solicitacao,
+    public ResponseEntity<SolicitacaoDTO> ResponderSolicitacao(@NotNull(message = "ID da solicitacao está nullo") @PathVariable Long id_solicitacao,
                                                                @Valid @RequestBody SolicitacaoDTO dto) {
         return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacaoService.responderSolicitacao(id_solicitacao, dto.aceito())));
     }
@@ -129,15 +131,15 @@ public class ResponsavelController {
 
     @PostMapping("/VincularEscola/{idResponsavel}/{idEscola}/{idDependente}")
     public ResponseEntity<ResponsavelDTO> vincularEscola(
-                                                        @NotBlank(message = "ID do responsável está nullo") @PathVariable Long idResponsavel,
-                                                        @NotBlank(message = "ID da escola está nullo") @PathVariable Long idEscola,
-                                                        @NotBlank(message = "ID do dependente está nullo") @PathVariable Long idDependente) {
+                                                        @NotNull(message = "ID do responsável está nullo") @PathVariable Long idResponsavel,
+                                                        @NotNull(message = "ID da escola está nullo") @PathVariable Long idEscola,
+                                                        @NotNull(message = "ID do dependente está nullo") @PathVariable Long idDependente) {
         Responsavel responsavel = responsavelService.vincularEscola(idResponsavel, idEscola, idDependente);
         return ResponseEntity.ok(ResponsavelDTO.toDTO(responsavel));
     }
 
     @GetMapping("/ListarSolicitacoes/{idResponsavel}")
-    public ResponseEntity<List<SolicitacaoDTO>> listarSolicitacoes(@NotBlank(message = "ID do responsável está nullo") @PathVariable Long idResponsavel) {
+    public ResponseEntity<List<SolicitacaoDTO>> listarSolicitacoes(@NotNull(message = "ID do responsável está nullo") @PathVariable Long idResponsavel) {
         List<SolicitacaoDTO> solicitacoes = responsavelService.listarSolicitacoes(idResponsavel).stream()
                 .map(SolicitacaoDTO::toDTO)
                 .collect(Collectors.toList());
@@ -145,7 +147,7 @@ public class ResponsavelController {
     }
 
     @PutMapping("/EncerrarVinculoViagem/{idSolicitacao}")
-    public ResponseEntity<SolicitacaoDTO> encerrarVinculoViagem(@NotBlank(message = "ID da solicitacao está nullo") @PathVariable Long idSolicitacao) {
+    public ResponseEntity<SolicitacaoDTO> encerrarVinculoViagem(@NotNull(message = "ID da solicitacao está nullo") @PathVariable Long idSolicitacao) {
         if (idSolicitacao == null) {
             return ResponseEntity.badRequest().build();
         }

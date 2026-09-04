@@ -11,20 +11,21 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import TioDaPerua.BackEndJava.entities.Dependente;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 
 public record DependenteDTO(Long id,
                             @NotBlank(message = "Nome do dependente está nullo") String nome,
                             @NotBlank(message = "CPF do dependente está nullo")
-                                @Pattern(regexp = "^\\d{8}$", message = "O CEP deve conter exatamente 8 dígitos numéricos.")
+                                @Pattern(regexp = "^\\d{11}$", message = "O CPF deve conter exatamente 11 dígitos numéricos.")
                                 @CPF(message = "CPF inválido.") String cpf,
-                            @NotBlank(message = "Data de nascimento do dependente está nullo")
+                            @NotNull(message = "Data de nascimento do dependente está nullo")
                                 @Past(message = "A data deve ser no passado.")
                                 @JsonFormat(pattern = "yyyy-MM-dd") LocalDate dataNascimento,
                             @NotBlank(message = "Período do dependente está nullo") String periodo,
                             @NotBlank(message = "Endereço do dependente está nullo") String endereco,
-                            @NotBlank(message = "Escola do dependente está nullo") @Valid EscolaResumoDTO escola,
+                            @NotNull(message = "Escola do dependente está nullo") @Valid EscolaResumoDTO escola,
                             @NotBlank(message = "Senha do dependente está nullo") String senha) {
 
 

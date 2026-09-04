@@ -6,18 +6,19 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import TioDaPerua.BackEndJava.entities.Notificacao;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 
 public record NotificacaoDTO(Long id,
                             @NotBlank(message = "Titulo está nullo")String titulo,
                             @NotBlank(message = "Mensagem está nullo")String mensagem,
-                            @NotBlank(message = "Data de criação está nullo")
+                            @NotNull(message = "Data de criação está nullo")
                                 @Past(message = "A data deve ser no passado.")
                                 @JsonFormat(pattern = "yyyy-MM-dd")LocalDateTime dataCriacao,
                             boolean visto,
-                            @NotBlank(message = "Remetente está nullo")UsuarioResumoDTO remetente,
-                            @NotBlank(message = "ID do remetente está nullo")Long remetenteId,
-                            @NotBlank(message = "ID do destinatário está nullo")Long destinatarioId) {
+                            @NotNull(message = "Remetente está nullo")UsuarioResumoDTO remetente,
+                            @NotNull(message = "ID do remetente está nullo")Long remetenteId,
+                            @NotNull(message = "ID do destinatário está nullo")Long destinatarioId) {
 
     public static NotificacaoDTO toDTO(Notificacao n, UsuarioResumoDTO remetenteResumo) {
         if (n == null) return null;

@@ -34,8 +34,10 @@ import TioDaPerua.BackEndJava.entities.ViagemDia;
 import TioDaPerua.BackEndJava.services.SolicitacaoService;
 import TioDaPerua.BackEndJava.services.ViagemService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
 
+@Validated
 @RestController
 @RequestMapping("/Viagem")
 public class ViagemController {
@@ -47,7 +49,7 @@ public class ViagemController {
     private SolicitacaoService solicitacaoService;
 
     @PostMapping("/CriarViagem/{id_motorista}")
-    public ResponseEntity<ViagemDTO> CriarViagem(@NotBlank(message = "ID do motorista está nullo") @PathVariable Long id_motorista, @Valid @RequestBody ViagemDTO dto) {
+    public ResponseEntity<ViagemDTO> CriarViagem(@NotNull(message = "ID do motorista está nullo") @PathVariable Long id_motorista, @Valid @RequestBody ViagemDTO dto) {
         if (id_motorista == null || dto == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -57,7 +59,7 @@ public class ViagemController {
     }
 
     @GetMapping("/ListarViagens/{idMotorista}")
-    public ResponseEntity<List<ViagemDTO>> ListarViagens(@NotBlank(message = "ID do motorista está nullo") @PathVariable Long idMotorista) {
+    public ResponseEntity<List<ViagemDTO>> ListarViagens(@NotNull(message = "ID do motorista está nullo") @PathVariable Long idMotorista) {
         List<ViagemDTO> viagens = viagemService.listarViagensAtivas(idMotorista).stream()
                 .map(ViagemDTO::toDTO)
                 .collect(Collectors.toList());
@@ -65,23 +67,23 @@ public class ViagemController {
     }
 
     @PutMapping("/DesativarViagem/{idViagem}")
-    public ResponseEntity<?> DesativarViagem(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long idViagem) {
+    public ResponseEntity<?> DesativarViagem(@NotNull(message = "ID da viagem está nullo") @PathVariable Long idViagem) {
         viagemService.desativarViagem(idViagem);
         return ResponseEntity.ok(Map.of("mensagem", "Viagem desativada com sucesso"));
     }
 
     @GetMapping("/Historico/{idMotorista}")
-    public ResponseEntity<List<ViagemDiaDTO>> Historico(@NotBlank(message = "ID do motorista está nullo") @PathVariable Long idMotorista) {
+    public ResponseEntity<List<ViagemDiaDTO>> Historico(@NotNull(message = "ID do motorista está nullo") @PathVariable Long idMotorista) {
         return ResponseEntity.ok(viagemService.historicoViagens(idMotorista));
     }
 
     @GetMapping("/ConsultarMotorista/{idViagemDia}")
-    public ResponseEntity<MotoristaViagemDTO> ConsultarMotorista(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long idViagemDia) {
+    public ResponseEntity<MotoristaViagemDTO> ConsultarMotorista(@NotNull(message = "ID da viagem está nullo") @PathVariable Long idViagemDia) {
         return ResponseEntity.ok(viagemService.consultarMotorista(idViagemDia));
     }
 
     @GetMapping("/Visualizar/{id_viagem}")
-    public ResponseEntity<ViagemDetalhadaDTO> Visualizar(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
+    public ResponseEntity<ViagemDetalhadaDTO> Visualizar(@NotNull(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
         Viagem viagem = viagemService.buscarViagem(id_viagem);
         List<ViagemDependente> vinculados = viagemService.buscarVinculados(id_viagem);
 
@@ -109,12 +111,12 @@ public class ViagemController {
     }
 
     @GetMapping("/VisualizarViagemDia/{id_viagemDia}")
-    public ResponseEntity<ViagemDiaDTO> visualizarViagemDia(@NotBlank(message = "ID da viagem está nullo") @PathVariable("id_viagemDia") Long id_viagemDia) {
+    public ResponseEntity<ViagemDiaDTO> visualizarViagemDia(@NotNull(message = "ID da viagem está nullo") @PathVariable("id_viagemDia") Long id_viagemDia) {
        return ResponseEntity.ok(viagemService.visualizarViagemDia(id_viagemDia));
     }
 
     @GetMapping("/DependentesDisponiveis/{id_viagem}")
-    public ResponseEntity<List<DependenteDTO>> DependentesDisponiveis(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
+    public ResponseEntity<List<DependenteDTO>> DependentesDisponiveis(@NotNull(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
         List<DependenteDTO> dependentes = solicitacaoService.listarDependentesDisponiveis(id_viagem).stream()
                 .map(DependenteDTO::toDTO)
                 .collect(Collectors.toList());
@@ -122,32 +124,32 @@ public class ViagemController {
     }
 
     @PostMapping("/SolicitarDependente/{id_viagem}/{id_dependente}")
-    public ResponseEntity<SolicitacaoDTO> SolicitarDependente(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long id_viagem,
-                                                              @NotBlank(message = "ID do dependente está nullo") @PathVariable Long id_dependente) {
+    public ResponseEntity<SolicitacaoDTO> SolicitarDependente(@NotNull(message = "ID da viagem está nullo") @PathVariable Long id_viagem,
+                                                              @NotNull(message = "ID do dependente está nullo") @PathVariable Long id_dependente) {
         Solicitacao solicitacao = solicitacaoService.solicitarDependente(id_viagem, id_dependente);
         return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacao));
     }
 
     @PostMapping("/IniciarViagemDia/{id_viagem}")
-    public ResponseEntity<ViagemDiaDTO> IniciarViagemDia(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
+    public ResponseEntity<ViagemDiaDTO> IniciarViagemDia(@NotNull(message = "ID da viagem está nullo") @PathVariable Long id_viagem) {
         ViagemDia viagemDia = viagemService.iniciarViagemDia(id_viagem);
         return ResponseEntity.ok(ViagemDiaDTO.toDTO(viagemDia));
     }
 
     @PutMapping("/AlterarStatusViagemDia")
-    public ResponseEntity<ViagemDiaDTO> AlterarStatusViagemDia(@NotBlank(message = "Viagem está nullo") @Valid @RequestBody AlterarStatusViagemDiaDTO dto) {
+    public ResponseEntity<ViagemDiaDTO> AlterarStatusViagemDia(@NotNull(message = "Viagem está nullo") @Valid @RequestBody AlterarStatusViagemDiaDTO dto) {
         ViagemDia atualizada = viagemService.alterarStatusViagemDia(dto.idViagemDia(), dto.novoStatus());
         return ResponseEntity.ok(ViagemDiaDTO.toDTO(atualizada));
     }
 
     @PutMapping("/AlterarStatusPresenca")
-    public ResponseEntity<List<ParadaDTO>> AlterarStatusPresenca(@NotBlank(message = "Viagem está nullo") @Valid @RequestBody AlterarStatusPresencaDTO dto) {
+    public ResponseEntity<List<ParadaDTO>> AlterarStatusPresenca(@NotNull(message = "Viagem está nullo") @Valid @RequestBody AlterarStatusPresencaDTO dto) {
         List<ParadaDTO> paradas = viagemService.alterarStatusPresenca(dto.idViagemDia(), dto.idDependente(), dto.novoStatus());
         return ResponseEntity.ok(paradas);
     }
 
     @GetMapping("/BuscarParadasViagemDia/{idViagemDia}")
-    public ResponseEntity<List<ParadaDTO>> BuscarParadasViagemDia(@NotBlank(message = "ID da viagem está nullo") @PathVariable Long idViagemDia) {
+    public ResponseEntity<List<ParadaDTO>> BuscarParadasViagemDia(@NotNull(message = "ID da viagem está nullo") @PathVariable Long idViagemDia) {
         return ResponseEntity.ok(viagemService.gerarParadasViagemDia(idViagemDia));
     }
 }

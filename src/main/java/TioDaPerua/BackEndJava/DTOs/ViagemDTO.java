@@ -3,9 +3,10 @@ package TioDaPerua.BackEndJava.DTOs;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public record ViagemDTO(Long id,
-                       @NotBlank(message = "ID do motorista está nullo") Long motoristaId,
+                       @NotNull(message = "ID do motorista está nullo") Long motoristaId,
                        @NotBlank(message = "Período está nullo") String periodo,
                        Boolean ativo) {
 
