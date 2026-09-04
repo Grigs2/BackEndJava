@@ -1,17 +1,22 @@
 package TioDaPerua.BackEndJava.DTOs;
 
-import TioDaPerua.BackEndJava.entities.Usuario;
-
 import java.io.Serial;
 import java.io.Serializable;
 
+import TioDaPerua.BackEndJava.entities.Usuario;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
 public record UsuarioDTO(
         Long id,
-        String email,
-        String senha,
-        String endereco,
-        String telefone,
-        String tipoPerfil
+        @NotBlank(message = "Email está nullo") 
+            @Email(message = "E-mail inválido.") String email,
+        @NotBlank(message = "Senha está nullo") String senha,
+        @NotBlank(message = "Endereço está nullo") String endereco,
+        @NotBlank(message = "Telefone está nullo") 
+            @Pattern(regexp = "^\\+\\d{2}\\d{2}\\d{8,9}$", message = "O telefone deve estar no padrão E.164 (+5511999999999).")String telefone,
+        @NotBlank(message = "Tipo de perfil está nullo") String tipoPerfil
 ) implements Serializable {
 
     @Serial

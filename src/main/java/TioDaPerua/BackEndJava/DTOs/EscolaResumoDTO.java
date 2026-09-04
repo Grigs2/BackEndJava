@@ -1,4 +1,6 @@
 package TioDaPerua.BackEndJava.DTOs;
 
-public record EscolaResumoDTO(Long id, String nome) {
+import jakarta.validation.constraints.NotBlank;
+
+public record EscolaResumoDTO(Long id, @NotBlank(message = "Nome da escola está nullo") String nome) {
 }

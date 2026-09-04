@@ -1,16 +1,23 @@
 package TioDaPerua.BackEndJava.DTOs;
 
-import TioDaPerua.BackEndJava.entities.Notificacao;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import TioDaPerua.BackEndJava.entities.Notificacao;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
+
 public record NotificacaoDTO(Long id,
-                            String titulo,
-                            String mensagem,
-                            LocalDateTime dataCriacao,
+                            @NotBlank(message = "Titulo está nullo")String titulo,
+                            @NotBlank(message = "Mensagem está nullo")String mensagem,
+                            @NotBlank(message = "Data de criação está nullo")
+                                @Past(message = "A data deve ser no passado.")
+                                @JsonFormat(pattern = "yyyy-MM-dd")LocalDateTime dataCriacao,
                             boolean visto,
-                            UsuarioResumoDTO remetente,
-                            Long remetenteId,
-                            Long destinatarioId) {
+                            @NotBlank(message = "Remetente está nullo")UsuarioResumoDTO remetente,
+                            @NotBlank(message = "ID do remetente está nullo")Long remetenteId,
+                            @NotBlank(message = "ID do destinatário está nullo")Long destinatarioId) {
 
     public static NotificacaoDTO toDTO(Notificacao n, UsuarioResumoDTO remetenteResumo) {
         if (n == null) return null;
@@ -21,8 +28,8 @@ public record NotificacaoDTO(Long id,
                 n.getData(),
                 n.getVisto() != null ? n.getVisto() : false,
                 remetenteResumo,
-                n.getRemetente() != null ? n.getRemetente().getId() : null,
-                n.getDestinatario() != null ? n.getDestinatario().getId() : null
+                n.getRemetente().getId(),
+                n.getDestinatario().getId()
         );
     }
 

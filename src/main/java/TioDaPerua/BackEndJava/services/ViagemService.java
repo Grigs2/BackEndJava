@@ -1,21 +1,42 @@
 package TioDaPerua.BackEndJava.services;
 
-import TioDaPerua.BackEndJava.DTOs.*;
-import TioDaPerua.BackEndJava.entities.*;
-import TioDaPerua.BackEndJava.enums.*;
-import TioDaPerua.BackEndJava.repositories.*;
-import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
-import TioDaPerua.BackEndJava.exceptions.BusinessException;
-import TioDaPerua.BackEndJava.exceptions.ConflictException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import TioDaPerua.BackEndJava.DTOs.DependenteParadaDTO;
+import TioDaPerua.BackEndJava.DTOs.MotoristaViagemDTO;
+import TioDaPerua.BackEndJava.DTOs.ParadaDTO;
+import TioDaPerua.BackEndJava.DTOs.ViagemDiaDTO;
+import TioDaPerua.BackEndJava.entities.Motorista;
+import TioDaPerua.BackEndJava.entities.Veiculo;
+import TioDaPerua.BackEndJava.entities.Viagem;
+import TioDaPerua.BackEndJava.entities.ViagemDependente;
+import TioDaPerua.BackEndJava.entities.ViagemDia;
+import TioDaPerua.BackEndJava.entities.ViagemPresenca;
+import TioDaPerua.BackEndJava.enums.Periodo;
+import TioDaPerua.BackEndJava.enums.StatusViagemDia;
+import TioDaPerua.BackEndJava.enums.StatusViagemPresenca;
+import TioDaPerua.BackEndJava.enums.TipoParada;
+import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.exceptions.ConflictException;
+import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
+import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
+import TioDaPerua.BackEndJava.repositories.SolicitacaoRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemDiaRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemPresencaRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemRepository;
 
 @Service
 public class ViagemService {
@@ -227,7 +248,7 @@ public class ViagemService {
         }
 
         Optional<Viagem> viagemExistente = viagemRepository.findByMotoristaIdAndPeriodo(idMotorista, viagem.getPeriodo());
-        if (viagemExistente.isPresent()) {
+        if (viagemExistente.isPresent() && Boolean.TRUE.equals(viagemExistente.get().getAtivo()) && viagem.getAtivo().equals(Boolean.TRUE)) {
             throw new ConflictException("Motorista já possui uma viagem ativa para este período: " + viagem.getPeriodo());
         }
 

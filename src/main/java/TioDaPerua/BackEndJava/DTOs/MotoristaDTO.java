@@ -1,16 +1,31 @@
 package TioDaPerua.BackEndJava.DTOs;
 
-import TioDaPerua.BackEndJava.entities.Motorista;
-
 import java.time.LocalDate;
 
+import org.hibernate.validator.constraints.br.CPF;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import TioDaPerua.BackEndJava.entities.Motorista;
+import TioDaPerua.BackEndJava.validations.CNH;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
+
 public record MotoristaDTO(Long id,
-                           String nome,
-                           LocalDate dataNascimento,
-                           String cpf,
-                           String cnh,
-                           UsuarioDTO usuarioDTO,
-                           VeiculoDTO veiculoDTO) {
+                            @NotBlank(message = "Nome está nullo")String nome,
+                            @NotBlank(message = "dataNascimento está nullo")
+                                @Past(message = "A data deve ser no passado.") 
+                                @JsonFormat(pattern = "yyyy-MM-dd")LocalDate dataNascimento,
+                            @NotBlank(message = "CPF está nullo")
+                                @Pattern(regexp = "^\\d{11}$", message = "O CPF deve conter exatamente 11 dígitos numéricos.")
+                                @CPF(message = "CPF inválido.")String cpf,
+                            @NotBlank(message = "CNH está nullo") 
+                                @Pattern(regexp = "^\\d{11}$", message = "A CNH deve conter exatamente 11 dígitos numéricos.")
+                                @CNH(message = "CNH inválida.") String cnh,
+                            @NotBlank(message = "Usuário está nullo")@Valid UsuarioDTO usuarioDTO,
+                            @NotBlank(message = "Veículo está nullo")@Valid VeiculoDTO veiculoDTO) {
 
 
     public static MotoristaDTO toDTO(Motorista motorista) {
