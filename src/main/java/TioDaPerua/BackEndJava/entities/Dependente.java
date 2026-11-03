@@ -3,11 +3,13 @@ package TioDaPerua.BackEndJava.entities;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +48,18 @@ public class Dependente implements Serializable {
     @ManyToMany(mappedBy = "dependentes", fetch = FetchType.LAZY)
     @ToString.Exclude
     private List<Responsavel> responsaveis = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responsavel_criador_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Responsavel responsavelCriador;
+
+    @Column(name = "responsavel_criador_definido_em")
+    private Instant responsavelCriadorDefinidoEm;
+
+    @Column(name = "responsavel_criador_definido_por_usuario_id")
+    private Long responsavelCriadorDefinidoPorUsuarioId;
 
 
     // Escola

@@ -5,10 +5,12 @@ import TioDaPerua.BackEndJava.DTOs.UsuarioResumoDTO;
 import TioDaPerua.BackEndJava.entities.Notificacao;
 import TioDaPerua.BackEndJava.services.NotificacaoService;
 import TioDaPerua.BackEndJava.services.UsuarioService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,7 +26,8 @@ public class NotificacaoController {
     private UsuarioService usuarioService;
 
     @PostMapping("/Enviar")
-    public ResponseEntity<NotificacaoDTO> Enviar(@RequestBody NotificacaoDTO dto) {
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isUsuarioAutenticado(authentication, #p0.remetenteId())")
+    public ResponseEntity<NotificacaoDTO> Enviar(@Valid @RequestBody NotificacaoDTO dto) {
         if (dto == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -36,6 +39,7 @@ public class NotificacaoController {
     }
 
     @GetMapping("/Listar/{id_usuario}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isUsuarioAutenticado(authentication, #p0)")
     public ResponseEntity<List<NotificacaoDTO>> Listar(@PathVariable Long id_usuario) {
         if (id_usuario == null) {
             return ResponseEntity.badRequest().build();
@@ -50,6 +54,7 @@ public class NotificacaoController {
     }
 
     @PutMapping("/VisualizarNotificacao/{id_notificacao}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDestinatarioNotificacao(authentication, #p0)")
     public ResponseEntity<Void> VisualizarNotificacao(@PathVariable Long id_notificacao) {
         if (id_notificacao == null) {
             return ResponseEntity.badRequest().build();
@@ -59,6 +64,7 @@ public class NotificacaoController {
     }
 
     @GetMapping("/ListarUsuarios")
+    @PreAuthorize("hasAnyRole('MOTORISTA', 'RESPONSAVEL', 'ESCOLA')")
     public ResponseEntity<List<UsuarioResumoDTO>> ListarUsuarios() {
         return ResponseEntity.ok(usuarioService.listarUsuariosResumo());
     }

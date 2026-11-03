@@ -1,12 +1,14 @@
 package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Responsavel;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDate;
 import java.util.List;
 
-public record ResponsavelDTO(Long id, String nome, String cpf, LocalDate dataNascimento,
-                             UsuarioDTO usuario, List<DependenteDTO> dependentes) {
+public record ResponsavelDTO(Long id, @NotBlank String nome, String cpf, LocalDate dataNascimento,
+                             @Valid UsuarioDTO usuario, @Valid List<DependenteDTO> dependentes) {
 
     public static ResponsavelDTO toDTO(Responsavel responsavel){
         if(responsavel == null){return null;}

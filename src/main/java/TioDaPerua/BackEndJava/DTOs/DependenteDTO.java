@@ -1,18 +1,21 @@
 package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Dependente;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 public record DependenteDTO(Long id,
-                            String nome,
+                            @NotBlank String nome,
                             String cpf,
-                            LocalDate dataNascimento,
+                            @PastOrPresent LocalDate dataNascimento,
                             String periodo,
                             String endereco,
-                            EscolaResumoDTO escola,
+                            @Valid EscolaResumoDTO escola,
                             String senha) {
 
 

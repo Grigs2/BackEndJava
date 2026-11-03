@@ -2,10 +2,11 @@ package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
+import jakarta.validation.constraints.NotBlank;
 
 public record ViagemDTO(Long id,
                        Long motoristaId,
-                       String periodo,
+                       @NotBlank String periodo,
                        Boolean ativo) {
 
     public static ViagemDTO toDTO(Viagem viagem) {

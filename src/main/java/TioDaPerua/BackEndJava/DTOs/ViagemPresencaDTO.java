@@ -8,7 +8,11 @@ public record ViagemPresencaDTO(Long id,
                                Long dependenteId,
                                String status,
                                LocalDateTime horarioEmbarque,
-                               LocalDateTime horarioDesembarque) {
+                               LocalDateTime horarioDesembarque,
+                               EnderecoSnapshotDTO enderecoEmbarqueSnapshot,
+                               EnderecoSnapshotDTO enderecoDesembarqueSnapshot,
+                               String enderecoEmbarqueLegadoSnapshot,
+                               String enderecoDesembarqueLegadoSnapshot) {
 
     public static ViagemPresencaDTO toDTO(ViagemPresenca vp) {
         if (vp == null) return null;
@@ -18,7 +22,11 @@ public record ViagemPresencaDTO(Long id,
                 vp.getDependente() != null ? vp.getDependente().getId() : null,
                 vp.getStatus() != null ? vp.getStatus().name() : null,
                 vp.getHorarioEmbarque(),
-                vp.getHorarioDesembarque()
+                vp.getHorarioDesembarque(),
+                EnderecoSnapshotDTO.toDTO(vp.getEnderecoEmbarqueSnapshot()),
+                EnderecoSnapshotDTO.toDTO(vp.getEnderecoDesembarqueSnapshot()),
+                vp.getEnderecoEmbarqueLegadoSnapshot(),
+                vp.getEnderecoDesembarqueLegadoSnapshot()
         );
     }
 }

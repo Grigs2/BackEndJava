@@ -1,15 +1,18 @@
 package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Veiculo;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 
 import java.io.Serial;
 import java.io.Serializable;
 
 public record VeiculoDTO(Long id,
-                         String modelo,
-                         String placa,
-                         int ano,
-                         int capacidade,
+                         @NotBlank String modelo,
+                         @NotBlank String placa,
+                         @Min(1900) int ano,
+                         @Positive int capacidade,
                          String cor) implements Serializable {
 
 

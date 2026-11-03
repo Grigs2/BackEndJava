@@ -4,5 +4,6 @@ public enum StatusViagemDia {
     PLANEJADA,
     EM_ANDAMENTO,
     FINALIZADA,
-    CANCELADA
+    CANCELADA,
+    INTERROMPIDA
 }

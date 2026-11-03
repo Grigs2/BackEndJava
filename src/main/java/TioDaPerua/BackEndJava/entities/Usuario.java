@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.Instant;
 @Data
 @Entity
 @Table(name = "usuario", schema = "public")
@@ -31,8 +32,24 @@ public class Usuario implements Serializable {
     @Column(name = "telefone", nullable = false)
     private String telefone;
 
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "endereco_operacional_id", unique = true)
+    private EnderecoOperacional enderecoOperacional;
+
     @Column(name = "tipoPerfil", nullable = false)
     private String tipoPerfil;
+
+    @Column(name = "conta_suspensa")
+    private Boolean contaSuspensa;
+
+    @Column(name = "termos_aceitos_em")
+    private Instant termosAceitosEm;
+
+    @Column(name = "termos_versao")
+    private String termosVersao;
+
+    @Transient
+    private Boolean aceitouTermos;
 
 
 
@@ -52,6 +69,11 @@ public class Usuario implements Serializable {
         this.endereco = usuario.getEndereco();
         this.telefone = usuario.getTelefone();
         this.tipoPerfil = usuario.getTipoPerfil();
+        this.contaSuspensa = usuario.getContaSuspensa();
+        this.enderecoOperacional = usuario.getEnderecoOperacional();
+        this.termosAceitosEm = usuario.getTermosAceitosEm();
+        this.termosVersao = usuario.getTermosVersao();
+        this.aceitouTermos = usuario.getAceitouTermos();
 
     }
 

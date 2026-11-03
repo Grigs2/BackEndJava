@@ -17,8 +17,11 @@ import TioDaPerua.BackEndJava.enums.StatusViagemDia;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import TioDaPerua.BackEndJava.exceptions.ConflictException;
+import TioDaPerua.BackEndJava.validation.SenhaPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +47,15 @@ public class ResponsavelService {
 
     @Autowired
     private ViagemDependenteRepository viagemDependenteRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TermosService termosService;
+
+    @Autowired
+    private CadastroUsuarioValidator cadastroUsuarioValidator;
 
     public Dependente buscarDependente(Long idDependente) {
         return dependenteRepository.findById(idDependente)
@@ -80,15 +92,46 @@ public class ResponsavelService {
             }
             return responsavelRepository.save(responsavelExistente);
         }
+        if (responsavel.getNome() == null || responsavel.getNome().isBlank()) {
+            throw new BusinessException("Nome do responsável é obrigatório");
+        }
+        if (responsavel.getUsuario() == null || responsavel.getUsuario().getId() != null
+                || responsavel.getUsuario().getSenha() == null
+                || responsavel.getUsuario().getSenha().isBlank()
+                || (responsavel.getDependentes() != null && !responsavel.getDependentes().isEmpty())) {
+            throw new IllegalArgumentException("Cadastro deve conter credenciais novas e não pode vincular dependentes existentes");
+        }
+        responsavel.setCpf(validarCpf(responsavel.getCpf()));
+        validarDataNascimento(responsavel.getDataNascimento());
+        cadastroUsuarioValidator.validarNovoCadastro(responsavel.getUsuario());
+        SenhaPolicy.exigirValida(responsavel.getUsuario().getSenha());
+        termosService.registrarAceite(responsavel.getUsuario(),
+                responsavel.getUsuario().getAceitouTermos());
+        responsavel.getUsuario().setSenha(passwordEncoder.encode(responsavel.getUsuario().getSenha()));
         return responsavelRepository.save(responsavel);
     }
 
+    @Transactional
     public Responsavel cadastrarDependente(Long idResponsavel, Dependente dependente) {
         if (idResponsavel == null || dependente == null) throw new IllegalArgumentException("IDs de responsável e dependente são obrigatórios");
+        if (dependente.getDataNascimento() != null && dependente.getDataNascimento().isAfter(java.time.LocalDate.now())) {
+            throw new BusinessException("A data de nascimento do dependente não pode estar no futuro");
+        }
+        if (dependente.getCpf() != null && !dependente.getCpf().isBlank()) {
+            dependente.setCpf(validarCpfDependente(dependente.getCpf()));
+        } else {
+            dependente.setCpf(null);
+        }
+        if (dependente.getId() != null) {
+            throw new IllegalArgumentException("Um novo dependente não pode reutilizar o ID de um cadastro existente");
+        }
         
         Responsavel responsavelExistente = responsavelRepository.findById(idResponsavel)
                 .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + idResponsavel));
 
+        if (responsavelExistente.getUsuario() == null) {
+            throw new BusinessException("Responsável sem usuário associado não pode cadastrar dependente");
+        }
         if (responsavelExistente.getDependentes() != null) {
             if (!responsavelExistente.getDependentes().contains(dependente)) {
                 responsavelExistente.getDependentes().add(dependente);
@@ -99,6 +142,9 @@ public class ResponsavelService {
             responsavelExistente.setDependentes(new java.util.ArrayList<>());
             responsavelExistente.getDependentes().add(dependente);
         }
+        dependente.setResponsavelCriador(responsavelExistente);
+        dependente.setResponsavelCriadorDefinidoEm(java.time.Instant.now());
+        dependente.setResponsavelCriadorDefinidoPorUsuarioId(responsavelExistente.getUsuario().getId());
         return responsavelRepository.save(responsavelExistente);
     }
 
@@ -168,17 +214,58 @@ public class ResponsavelService {
                 .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado com id: " + responsavel.getId()));
 
         existente.setNome(responsavel.getNome());
-        existente.setCpf(responsavel.getCpf());
-        existente.setDataNascimento(responsavel.getDataNascimento());
+        if (responsavel.getCpf() != null) {
+            String cpf = DocumentoFiscalValidator.normalizarCpf(responsavel.getCpf());
+            if (!DocumentoFiscalValidator.cpfValido(cpf)) {
+                throw new BusinessException("CPF inválido");
+            }
+            if (responsavelRepository.existsByCpfAndIdNot(cpf, existente.getId())) {
+                throw new BusinessException("CPF já cadastrado");
+            }
+            existente.setCpf(cpf);
+        }
+        if (responsavel.getDataNascimento() != null) {
+            validarDataNascimento(responsavel.getDataNascimento());
+            existente.setDataNascimento(responsavel.getDataNascimento());
+        }
 
         if (responsavel.getUsuario() != null && existente.getUsuario() != null) {
             Usuario uExistente = existente.getUsuario();
             Usuario uNovo = responsavel.getUsuario();
+            cadastroUsuarioValidator.validarAtualizacao(uNovo, uExistente.getId());
             uExistente.setEmail(uNovo.getEmail());
             uExistente.setEndereco(uNovo.getEndereco());
             uExistente.setTelefone(uNovo.getTelefone());
         }
 
         return responsavelRepository.save(existente);
+    }
+
+    private String validarCpf(String cpfInformado) {
+        String cpf = DocumentoFiscalValidator.normalizarCpf(cpfInformado);
+        if (!DocumentoFiscalValidator.cpfValido(cpf)) {
+            throw new BusinessException("CPF inválido");
+        }
+        if (responsavelRepository.existsByCpf(cpf)) {
+            throw new BusinessException("CPF já cadastrado");
+        }
+        return cpf;
+    }
+
+    private String validarCpfDependente(String cpfInformado) {
+        String cpf = DocumentoFiscalValidator.normalizarCpf(cpfInformado);
+        if (!DocumentoFiscalValidator.cpfValido(cpf)) {
+            throw new BusinessException("CPF inválido");
+        }
+        if (dependenteRepository.existsByCpf(cpf)) {
+            throw new BusinessException("CPF já cadastrado");
+        }
+        return cpf;
+    }
+
+    private void validarDataNascimento(java.time.LocalDate dataNascimento) {
+        if (dataNascimento != null && dataNascimento.isAfter(java.time.LocalDate.now())) {
+            throw new BusinessException("A data de nascimento do responsável não pode estar no futuro");
+        }
     }
 }

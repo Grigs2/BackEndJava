@@ -1,16 +1,19 @@
 package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Notificacao;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.time.LocalDateTime;
 
 public record NotificacaoDTO(Long id,
-                            String titulo,
-                            String mensagem,
+                            @NotBlank String titulo,
+                            @NotBlank String mensagem,
                             LocalDateTime dataCriacao,
                             boolean visto,
                             UsuarioResumoDTO remetente,
-                            Long remetenteId,
-                            Long destinatarioId) {
+                            @NotNull @Positive Long remetenteId,
+                            @NotNull @Positive Long destinatarioId) {
 
     public static NotificacaoDTO toDTO(Notificacao n, UsuarioResumoDTO remetenteResumo) {
         if (n == null) return null;

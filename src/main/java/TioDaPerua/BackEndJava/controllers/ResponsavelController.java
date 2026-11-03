@@ -19,6 +19,12 @@ import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import TioDaPerua.BackEndJava.services.DependenteService;
+import TioDaPerua.BackEndJava.services.EnderecoDependenteService;
+import TioDaPerua.BackEndJava.services.RedeResponsaveisService;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/Responsavel")
@@ -39,8 +45,22 @@ public class ResponsavelController {
     @Autowired
     private DependenteService dependenteService;
 
+    @Autowired
+    private EnderecoDependenteService enderecoDependenteService;
+
+    @Autowired
+    private RedeResponsaveisService redeResponsaveisService;
+
+    @GetMapping("/Perfil")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<ResponsavelDTO> consultarPerfil(@AuthenticationPrincipal Jwt jwt) {
+        Usuario usuario = usuarioService.findByID(Long.valueOf(jwt.getSubject()));
+        return ResponseEntity.ok(ResponsavelDTO.toDTO(usuarioService.logarResponsavel(usuario)));
+    }
+
     @PutMapping("/AlterarInfos")
-    public ResponseEntity<ResponsavelDTO> AlterarInfos(@RequestBody ResponsavelDTO dto) {
+    @PreAuthorize("#p0 != null && #p0.usuario() != null && @resourceAuthorization.isResponsavel(authentication, #p0.id()) && @resourceAuthorization.isUsuarioAutenticado(authentication, #p0.usuario().id())")
+    public ResponseEntity<ResponsavelDTO> AlterarInfos(@Valid @RequestBody ResponsavelDTO dto) {
         if (dto == null || dto.usuario() == null || dto.usuario().senha() == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -52,18 +72,142 @@ public class ResponsavelController {
     }
 
     @PutMapping("/Dependente/AlterarInfos")
-    public ResponseEntity<DependenteDTO> AlterarDependenteInfos(@RequestBody DependenteDTO dto) {
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0.id())")
+    public ResponseEntity<DependenteDTO> AlterarDependenteInfos(
+            @Valid @RequestBody DependenteDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
         if (dto == null || dto.senha() == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        Dependente atualizado = dependenteService.alterarInfos(DependenteDTO.toEntity(dto), dto.senha());
+        Dependente atualizado = dependenteService.alterarInfos(
+                DependenteDTO.toEntity(dto), dto.senha(), Long.valueOf(jwt.getSubject()));
         return ResponseEntity.ok(DependenteDTO.toDTO(atualizado));
     }
 
-    @PostMapping("/Cadastrar")
-    public ResponseEntity<ResponsavelDTO> cadastrar(@RequestBody ResponsavelDTO dto) {
+    @GetMapping("/Dependente/{idDependente}/Enderecos")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<List<EnderecoDependenteDTO>> listarEnderecos(
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(enderecoDependenteService.listar(
+                idDependente, Long.valueOf(jwt.getSubject())));
+    }
+
+    @PostMapping("/Dependente/{idDependente}/Enderecos")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<EnderecoDependenteDTO> adicionarEndereco(
+            @PathVariable Long idDependente,
+            @Valid @RequestBody EnderecoDependenteRequestDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
         if (dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(enderecoDependenteService.adicionar(
+                idDependente, Long.valueOf(jwt.getSubject()), dto));
+    }
+
+    @PutMapping("/Dependente/{idDependente}/Enderecos/{idEndereco}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<EnderecoDependenteDTO> alterarEndereco(
+            @PathVariable Long idDependente,
+            @PathVariable Long idEndereco,
+            @Valid @RequestBody EnderecoDependenteRequestDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(enderecoDependenteService.alterar(
+                idDependente, idEndereco, Long.valueOf(jwt.getSubject()), dto));
+    }
+
+    @DeleteMapping("/Dependente/{idDependente}/Enderecos/{idEndereco}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<Void> desativarEndereco(
+            @PathVariable Long idDependente,
+            @PathVariable Long idEndereco,
+            @AuthenticationPrincipal Jwt jwt) {
+        enderecoDependenteService.desativar(
+                idDependente, idEndereco, Long.valueOf(jwt.getSubject()));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/Dependente/{idDependente}/Convites")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<ConviteResponsavelDTO> convidarResponsavel(
+            @PathVariable Long idDependente,
+            @Valid @RequestBody CriarConviteResponsavelDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(redeResponsaveisService.convidar(
+                idDependente, Long.valueOf(jwt.getSubject()), dto));
+    }
+
+    @GetMapping("/Convites/Pendentes")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<List<ConviteResponsavelDTO>> listarConvitesPendentes(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(redeResponsaveisService.listarPendentes(
+                Long.valueOf(jwt.getSubject())));
+    }
+
+    @GetMapping("/Dependente/{idDependente}/Convites")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<List<ConviteResponsavelDTO>> listarHistoricoConvites(
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(redeResponsaveisService.listarHistorico(
+                idDependente, Long.valueOf(jwt.getSubject())));
+    }
+
+    @GetMapping("/Dependente/{idDependente}/Responsaveis")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<List<VinculoResponsavelDTO>> listarResponsaveisAtivos(
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(redeResponsaveisService.listarResponsaveisAtivos(
+                idDependente, Long.valueOf(jwt.getSubject())));
+    }
+
+    @PutMapping("/Convites/{idConvite}/Aceitar")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<ConviteResponsavelDTO> aceitarConvite(
+            @PathVariable Long idConvite,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(redeResponsaveisService.responder(
+                idConvite, Long.valueOf(jwt.getSubject()), true));
+    }
+
+    @PutMapping("/Convites/{idConvite}/Recusar")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<ConviteResponsavelDTO> recusarConvite(
+            @PathVariable Long idConvite,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(redeResponsaveisService.responder(
+                idConvite, Long.valueOf(jwt.getSubject()), false));
+    }
+
+    @DeleteMapping("/Dependente/{idDependente}/Responsaveis/{idResponsavel}")
+    @PreAuthorize("hasAnyRole('RESPONSAVEL', 'ADMIN')")
+    public ResponseEntity<Void> revogarVinculoResponsavel(
+            @PathVariable Long idDependente,
+            @PathVariable Long idResponsavel,
+            @AuthenticationPrincipal Jwt jwt,
+            org.springframework.security.core.Authentication authentication) {
+        boolean administrador = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        redeResponsaveisService.revogar(
+                idDependente, idResponsavel, Long.valueOf(jwt.getSubject()), administrador);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/Cadastrar")
+    public ResponseEntity<ResponsavelDTO> cadastrar(@Valid @RequestBody ResponsavelDTO dto) {
+        if (dto == null || dto.id() != null || dto.usuario() == null
+                || dto.usuario().id() != null || !"RESPONSAVEL".equals(dto.usuario().tipoPerfil())
+                || (dto.dependentes() != null && !dto.dependentes().isEmpty())) {
             return ResponseEntity.badRequest().build();
         }
         Responsavel entity = ResponsavelDTO.toEntity(dto);
@@ -72,7 +216,7 @@ public class ResponsavelController {
     }
 
     @PostMapping("/Autenticar")
-    public ResponseEntity<ResponsavelDTO> autenticar(@RequestBody UsuarioDTO dto) {
+    public ResponseEntity<ResponsavelDTO> autenticar(@Valid @RequestBody UsuarioDTO dto) {
         if (dto == null || dto.email() == null || dto.senha() == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -86,8 +230,9 @@ public class ResponsavelController {
     }
 
     @PostMapping("/CadastrarDependente/{id_Responsavel}")
-    public ResponseEntity<ResponsavelDTO> cadastrarDependente(@PathVariable Long id_Responsavel, @RequestBody DependenteDTO dto) {
-        if (dto == null || id_Responsavel == null) {
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavel(authentication, #p0)")
+    public ResponseEntity<ResponsavelDTO> cadastrarDependente(@PathVariable Long id_Responsavel, @Valid @RequestBody DependenteDTO dto) {
+        if (dto == null || dto.id() != null || id_Responsavel == null) {
             return ResponseEntity.badRequest().build();
         }
         Dependente entity = DependenteDTO.toEntity(dto);
@@ -96,6 +241,7 @@ public class ResponsavelController {
     }
 
     @GetMapping("/Monitorar/{id_dependente}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
     public ResponseEntity<MonitoramentoDependenteDTO> Monitorar(@PathVariable Long id_dependente) {
         if (id_dependente == null) {
             return ResponseEntity.badRequest().build();
@@ -124,14 +270,20 @@ public class ResponsavelController {
     }
 
     @PostMapping("/ResponderSolicitacao/{id_solicitacao}")
-    public ResponseEntity<SolicitacaoDTO> ResponderSolicitacao(@PathVariable Long id_solicitacao, @RequestBody SolicitacaoDTO dto) {
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDaSolicitacao(authentication, #p0)")
+    public ResponseEntity<SolicitacaoDTO> ResponderSolicitacao(
+            @PathVariable Long id_solicitacao,
+            @Valid @RequestBody SolicitacaoDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
         if (id_solicitacao == null || dto == null) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacaoService.responderSolicitacao(id_solicitacao, dto.aceito())));
+        return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacaoService.responderSolicitacao(
+                id_solicitacao, dto.aceito(), Long.valueOf(jwt.getSubject()))));
     }
 
     @GetMapping("/ListarEscolas")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
     public ResponseEntity<List<EscolaDTO>> listarEscolas() {
         List<EscolaDTO> escolas = escolaService.listarEscolas().stream()
                 .map(EscolaDTO::toDTO)
@@ -140,6 +292,7 @@ public class ResponsavelController {
     }
 
     @PostMapping("/VincularEscola/{idResponsavel}/{idEscola}/{idDependente}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavel(authentication, #p0)")
     public ResponseEntity<ResponsavelDTO> vincularEscola(
             @PathVariable Long idResponsavel,
             @PathVariable Long idEscola,
@@ -152,6 +305,7 @@ public class ResponsavelController {
     }
 
     @GetMapping("/ListarSolicitacoes/{idResponsavel}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavel(authentication, #p0)")
     public ResponseEntity<List<SolicitacaoDTO>> listarSolicitacoes(@PathVariable Long idResponsavel) {
         if (idResponsavel == null) {
             return ResponseEntity.badRequest().build();
@@ -163,6 +317,7 @@ public class ResponsavelController {
     }
 
     @PutMapping("/EncerrarVinculoViagem/{idSolicitacao}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDaSolicitacao(authentication, #p0)")
     public ResponseEntity<SolicitacaoDTO> encerrarVinculoViagem(@PathVariable Long idSolicitacao) {
         if (idSolicitacao == null) {
             return ResponseEntity.badRequest().build();

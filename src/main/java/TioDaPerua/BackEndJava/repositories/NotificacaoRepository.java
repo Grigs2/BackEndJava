@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Repository
 public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> {
@@ -15,4 +16,8 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
 
     @Query("SELECT n FROM Notificacao n WHERE n.destinatario.id = :usuarioId AND n.visto = false ORDER BY n.data DESC")
     List<Notificacao> findNaoVistasByDestinatarioId(Long usuarioId);
+
+    boolean existsByIdAndDestinatario_Id(Long notificacaoId, Long usuarioId);
+
+    int deleteByDataBefore(LocalDateTime limite);
 }

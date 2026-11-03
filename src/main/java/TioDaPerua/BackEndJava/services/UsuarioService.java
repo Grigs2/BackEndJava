@@ -1,22 +1,29 @@
 package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.entities.Escola;
+import TioDaPerua.BackEndJava.entities.Administrador;
 import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.entities.Responsavel;
 import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.repositories.EscolaRepository;
+import TioDaPerua.BackEndJava.repositories.AdministradorRepository;
 import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.exceptions.UnauthorizedException;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.validation.SenhaPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import TioDaPerua.BackEndJava.DTOs.UsuarioResumoDTO;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Service
 public class UsuarioService {
@@ -32,6 +39,12 @@ public class UsuarioService {
 
     @Autowired
     private EscolaRepository escolaRepository;
+
+    @Autowired
+    private AdministradorRepository administradorRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     public List<UsuarioResumoDTO> listarUsuariosResumo() {
         return usuarioRepository.findAll().stream()
@@ -57,6 +70,8 @@ public class UsuarioService {
             return responsavelRepository.findByUsuarioId(u.getId()).map(Responsavel::getNome).orElse("Desconhecido");
         } else if ("ESCOLA".equals(u.getTipoPerfil())) {
             return escolaRepository.findByUsuarioId(u.getId()).map(Escola::getNome).orElse("Desconhecido");
+        } else if ("ADMIN".equals(u.getTipoPerfil())) {
+            return u.getEmail();
         }
         return "Desconhecido";
     }
@@ -77,6 +92,7 @@ public class UsuarioService {
         return usuarioRepository.save(usuario);
     }
 
+    @Transactional
     public Usuario autenticar(String email, String senha) {
         if (email == null || email.isEmpty() || senha == null || senha.isEmpty()) {
             throw new IllegalArgumentException("Email e senha são obrigatórios");
@@ -84,12 +100,25 @@ public class UsuarioService {
         
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new UnauthorizedException("Credenciais inválidas"));
-
-        if (senha.equals(usuario.getSenha())) {
-            return usuario;
-        } else {
+        if (Boolean.TRUE.equals(usuario.getContaSuspensa())) {
             throw new UnauthorizedException("Credenciais inválidas");
         }
+
+        String senhaArmazenada = usuario.getSenha();
+        if (senhaArmazenada != null && isBcryptHash(senhaArmazenada)
+                && passwordEncoder.matches(senha, senhaArmazenada)) {
+            return usuario;
+        }
+
+        if (senhaArmazenada == null || isBcryptHash(senhaArmazenada)
+                || !MessageDigest.isEqual(
+                        senha.getBytes(StandardCharsets.UTF_8),
+                        senhaArmazenada.getBytes(StandardCharsets.UTF_8))) {
+            throw new UnauthorizedException("Credenciais inválidas");
+        }
+
+        usuario.setSenha(passwordEncoder.encode(senha));
+        return usuarioRepository.save(usuario);
     }
 
     public Motorista logarMotorista(Usuario usuario) {
@@ -119,17 +148,60 @@ public class UsuarioService {
                 .orElseThrow(() -> new ResourceNotFoundException("Escola não encontrada para o usuário id: " + usuario.getId()));
     }
 
+    public Administrador logarAdministrador(Usuario usuario) {
+        if (usuario == null) throw new IllegalArgumentException("Usuário não pode ser nulo");
+        if (!"ADMIN".equals(usuario.getTipoPerfil())) {
+            throw new BusinessException("Perfil do usuário não é Administrador");
+        }
+        return administradorRepository.findByUsuarioId(usuario.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Administrador não encontrado para o usuário id: " + usuario.getId()));
+    }
+
     public boolean verificarSenha(Long usuarioId, String senhaInformada) {
         if (usuarioId == null || senhaInformada == null) return false;
         Usuario usuario = usuarioRepository.findById(usuarioId).orElse(null);
         if (usuario == null) return false;
-        return senhaInformada.equals(usuario.getSenha());
+        String senhaArmazenada = usuario.getSenha();
+        if (senhaArmazenada == null) return false;
+        if (isBcryptHash(senhaArmazenada)) {
+            return passwordEncoder.matches(senhaInformada, senhaArmazenada);
+        }
+        if (!MessageDigest.isEqual(
+                senhaInformada.getBytes(StandardCharsets.UTF_8),
+                senhaArmazenada.getBytes(StandardCharsets.UTF_8))) {
+            return false;
+        }
+        usuario.setSenha(passwordEncoder.encode(senhaInformada));
+        usuarioRepository.save(usuario);
+        return true;
     }
 
     public void validarSenha(Long usuarioId, String senhaInformada) {
         if (!verificarSenha(usuarioId, senhaInformada)) {
             throw new UnauthorizedException("Senha inválida");
         }
+    }
+
+    @Transactional
+    public void alterarSenha(Long usuarioId, String senhaAtual, String novaSenha) {
+        if (usuarioId == null || senhaAtual == null || senhaAtual.isBlank()) {
+            throw new IllegalArgumentException("Usuário e senha atual são obrigatórios");
+        }
+        SenhaPolicy.exigirValida(novaSenha);
+        validarSenha(usuarioId, senhaAtual);
+        definirNovaSenha(usuarioId, novaSenha);
+    }
+
+    @Transactional
+    public void definirNovaSenha(Long usuarioId, String novaSenha) {
+        if (usuarioId == null) {
+            throw new IllegalArgumentException("ID do usuário é obrigatório");
+        }
+        SenhaPolicy.exigirValida(novaSenha);
+        Usuario usuario = findByID(usuarioId);
+        usuario.setSenha(passwordEncoder.encode(novaSenha));
+        usuarioRepository.save(usuario);
     }
 
     public Usuario updateUsuario(Usuario usuario) {
@@ -142,5 +214,9 @@ public class UsuarioService {
         existente.setTelefone(usuario.getTelefone());
         
         return usuarioRepository.save(existente);
+    }
+
+    private boolean isBcryptHash(String value) {
+        return value.matches("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
     }
 }

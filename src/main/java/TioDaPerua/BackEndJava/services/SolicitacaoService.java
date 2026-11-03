@@ -1,7 +1,9 @@
 package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.entities.Dependente;
+import TioDaPerua.BackEndJava.entities.Responsavel;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
+import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.entities.ViagemDependente;
 import TioDaPerua.BackEndJava.repositories.*;
@@ -10,6 +12,8 @@ import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import TioDaPerua.BackEndJava.exceptions.ConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +33,9 @@ public class SolicitacaoService {
 
     @Autowired
     private ViagemDependenteRepository viagemDependenteRepository;
+
+    @Autowired
+    private NotificacaoService notificacaoService;
 
     public List<Dependente> listarDependentesDisponiveis(Long idViagem) {
         return dependenteRepository.findDisponiveisParaViagem(idViagem);
@@ -56,9 +63,12 @@ public class SolicitacaoService {
         solicitacao.setViagem(viagem);
         solicitacao.setDependente(dependente);
         
-        // Pega o primeiro responsável (regra: deve ter pelo menos um)
         if (dependente.getResponsaveis() != null && !dependente.getResponsaveis().isEmpty()) {
-            solicitacao.setResponsavel(dependente.getResponsaveis().get(0));
+            Responsavel responsavelPrincipal = dependente.getResponsavelCriador();
+            if (responsavelPrincipal == null && dependente.getResponsaveis().size() == 1) {
+                responsavelPrincipal = dependente.getResponsaveis().get(0);
+            }
+            solicitacao.setResponsavel(responsavelPrincipal);
         } else {
             throw new BusinessException("Dependente não possui responsáveis vinculados");
         }
@@ -70,10 +80,18 @@ public class SolicitacaoService {
         return solicitacaoRepository.save(solicitacao);
     }
 
-    public Solicitacao responderSolicitacao(Long idSolicitacao, boolean aceito) {
+    @Transactional
+    public Solicitacao responderSolicitacao(Long idSolicitacao, boolean aceito, Long atorUsuarioId) {
+        if (idSolicitacao == null || atorUsuarioId == null) {
+            throw new BusinessException("Solicitação e usuário autenticado são obrigatórios");
+        }
         Solicitacao solicitacao = solicitacaoRepository.findById(idSolicitacao)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com id: " + idSolicitacao));
 
+        if (solicitacao.getResponsavel() == null || solicitacao.getResponsavel().getUsuario() == null
+                || !atorUsuarioId.equals(solicitacao.getResponsavel().getUsuario().getId())) {
+            throw new AccessDeniedException("Somente o responsável da solicitação pode respondê-la");
+        }
         if (solicitacao.isRespondido()) {
             throw new ConflictException("Solicitação já foi respondida");
         }
@@ -90,6 +108,19 @@ public class SolicitacaoService {
             viagemDependenteRepository.save(vinculo);
         }
 
-        return solicitacaoRepository.save(solicitacao);
+        Solicitacao salva = solicitacaoRepository.save(solicitacao);
+        Usuario usuarioMotorista = solicitacao.getViagem() == null
+                || solicitacao.getViagem().getMotorista() == null
+                ? null : solicitacao.getViagem().getMotorista().getUsuario();
+        if (usuarioMotorista == null || usuarioMotorista.getId() == null) {
+            throw new ResourceNotFoundException("Motorista da solicitação não encontrado");
+        }
+        String estado = aceito ? "aceita" : "recusada";
+        notificacaoService.criarNotificacoesAutomaticas(
+                atorUsuarioId,
+                List.of(usuarioMotorista.getId()),
+                "Solicitação " + estado,
+                "Sua solicitação de transporte foi " + estado + ".");
+        return salva;
     }
 }

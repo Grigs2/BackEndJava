@@ -4,6 +4,7 @@ import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.entities.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.util.Optional;
 
@@ -13,5 +14,22 @@ public interface MotoristaRepository extends JpaRepository<Motorista, Long> {
     public Optional<Motorista> findByEmail (String email);
 
     @Query(value = "SELECT mot FROM Motorista mot WHERE mot.usuario.id = :id")
+    @EntityGraph(attributePaths = {"usuario", "usuario.enderecoOperacional"})
     public Optional<Motorista> findByUsuarioId (Long id);
+
+    @Query("SELECT mot FROM Motorista mot JOIN FETCH mot.usuario usu "
+            + "LEFT JOIN FETCH usu.enderecoOperacional WHERE mot.id = :id")
+    Optional<Motorista> findByIdComEnderecoOperacional(Long id);
+
+    Optional<Motorista> findByCpf(String cpf);
+
+    boolean existsByIdAndUsuario_Id(Long motoristaId, Long usuarioId);
+
+    boolean existsByCpf(String cpf);
+
+    boolean existsByCpfAndIdNot(String cpf, Long id);
+
+    boolean existsByVeiculo_Placa(String placa);
+
+    boolean existsByVeiculo_PlacaAndIdNot(String placa, Long motoristaId);
 }

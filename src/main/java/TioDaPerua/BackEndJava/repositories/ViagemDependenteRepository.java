@@ -18,7 +18,7 @@ public interface ViagemDependenteRepository extends JpaRepository<ViagemDependen
     Optional<ViagemDependente> findByViagemIdAndDependenteId(Long viagemId, Long dependenteId);
 
     @Query("""
-        SELECT vd
+        SELECT DISTINCT vd
         FROM ViagemDependente vd
         JOIN FETCH vd.dependente d
         LEFT JOIN FETCH d.escola e
@@ -34,15 +34,27 @@ public interface ViagemDependenteRepository extends JpaRepository<ViagemDependen
     void desativarPorViagemId(Long viagemId);
 
     @Query("""
-        SELECT vd
+        SELECT DISTINCT vd
         FROM ViagemDependente vd
         JOIN FETCH vd.dependente d
         LEFT JOIN FETCH d.escola e
         LEFT JOIN FETCH e.usuario eu
+        LEFT JOIN FETCH eu.enderecoOperacional
         LEFT JOIN FETCH d.responsaveis r
         LEFT JOIN FETCH r.usuario ru
         WHERE vd.viagem.id = :idViagem
         AND vd.ativo = true
     """)
     List<ViagemDependente> buscarDependentesCompletos(Long idViagem);
+
+    @Query("""
+        SELECT CASE WHEN COUNT(vd) > 0 THEN true ELSE false END
+        FROM ViagemDependente vd
+        JOIN vd.dependente dependente
+        JOIN dependente.responsaveis responsavel
+        WHERE vd.viagem.id = :viagemId
+        AND responsavel.usuario.id = :usuarioId
+    """)
+    boolean existeVinculoResponsavel(@org.springframework.data.repository.query.Param("viagemId") Long viagemId,
+                                     @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
 }

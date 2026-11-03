@@ -1,7 +1,9 @@
 package TioDaPerua.BackEndJava.repositories;
 
 import TioDaPerua.BackEndJava.entities.Dependente;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -19,6 +21,40 @@ public interface DependenteRepository extends JpaRepository<Dependente, Long> {
         AND r.id = :responsavelId
     """)
     Optional<Dependente> findByIdAndResponsavelId(Long dependenteId, Long responsavelId);
+
+    @Query("""
+        SELECT d
+        FROM Dependente d
+        JOIN d.responsaveis r
+        WHERE d.id = :dependenteId
+        AND r.usuario.id = :usuarioId
+    """)
+    Optional<Dependente> findByIdAndResponsavelUsuarioId(
+            @org.springframework.data.repository.query.Param("dependenteId") Long dependenteId,
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT d
+        FROM Dependente d
+        JOIN d.responsaveis r
+        WHERE d.id = :dependenteId
+        AND r.usuario.id = :usuarioId
+    """)
+    Optional<Dependente> findByIdAndResponsavelUsuarioIdForUpdate(
+            @org.springframework.data.repository.query.Param("dependenteId") Long dependenteId,
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Dependente d WHERE d.id = :dependenteId")
+    Optional<Dependente> findByIdForUpdate(
+            @org.springframework.data.repository.query.Param("dependenteId") Long dependenteId);
+
+    List<Dependente> findByResponsavelCriadorIsNullOrderById();
+
+    boolean existsByCpf(String cpf);
+
+    boolean existsByCpfAndIdNot(String cpf, Long id);
 
     @Query("""
         SELECT d FROM Dependente d

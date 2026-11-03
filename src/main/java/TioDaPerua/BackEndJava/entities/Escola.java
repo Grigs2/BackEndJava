@@ -21,6 +21,9 @@ public class Escola implements Serializable  {
     @Column
     private String nome;
 
+    @Column(unique = true, length = 14)
+    private String cnpj;
+
     @Column
     private String admResponsavel;
 

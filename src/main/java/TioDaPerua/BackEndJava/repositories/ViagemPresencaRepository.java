@@ -11,7 +11,11 @@ import java.util.Optional;
 @Repository
 public interface ViagemPresencaRepository extends JpaRepository<ViagemPresenca, Long> {
 
-    @Query("SELECT vp FROM ViagemPresenca vp WHERE vp.viagemDia.id = :viagemDiaId")
+    @Query("""
+        SELECT vp FROM ViagemPresenca vp
+        JOIN FETCH vp.dependente
+        WHERE vp.viagemDia.id = :viagemDiaId
+    """)
     List<ViagemPresenca> findByViagemDiaId(Long viagemDiaId);
 
     @Query("""

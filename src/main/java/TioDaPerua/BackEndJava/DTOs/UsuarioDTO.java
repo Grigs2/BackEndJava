@@ -1,17 +1,20 @@
 package TioDaPerua.BackEndJava.DTOs;
 
 import TioDaPerua.BackEndJava.entities.Usuario;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
 import java.io.Serial;
 import java.io.Serializable;
 
 public record UsuarioDTO(
         Long id,
-        String email,
-        String senha,
+        @NotBlank @Email String email,
+        @NotBlank String senha,
         String endereco,
         String telefone,
-        String tipoPerfil
+        String tipoPerfil,
+        Boolean aceitouTermos
 ) implements Serializable {
 
     @Serial
@@ -20,12 +23,16 @@ public record UsuarioDTO(
 
     public static UsuarioDTO toDTO(Usuario usuario) {
         if (usuario == null) return null;
-        return new UsuarioDTO(usuario.getId(), usuario.getEmail(),null, usuario.getEndereco(), usuario.getTelefone(), usuario.getTipoPerfil());
+        return new UsuarioDTO(usuario.getId(), usuario.getEmail(), null, usuario.getEndereco(),
+                usuario.getTelefone(), usuario.getTipoPerfil(),
+                usuario.getTermosAceitosEm() == null ? null : true);
     }
 
     public static Usuario toEntity(UsuarioDTO dto) {
         if (dto == null) return null;
-        return new Usuario(dto.email, dto.senha, dto.endereco, dto.telefone, dto.tipoPerfil);
+        Usuario usuario = new Usuario(dto.email, dto.senha, dto.endereco, dto.telefone, dto.tipoPerfil);
+        usuario.setAceitouTermos(dto.aceitouTermos());
+        return usuario;
     }
 
 }
