@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/Autenticacao")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Autenticacao")
 public class AutenticacaoController {
 
     private final AutenticacaoService autenticacaoService;

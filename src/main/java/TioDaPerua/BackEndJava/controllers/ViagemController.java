@@ -29,6 +29,7 @@ import org.springframework.data.domain.Page;
 
 @RestController
 @RequestMapping("/Viagem")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Viagem")
 public class ViagemController {
 
     @Autowired

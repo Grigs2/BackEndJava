@@ -26,6 +26,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/Escola")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Escola")
 public class EscolaController {
 
     @Autowired

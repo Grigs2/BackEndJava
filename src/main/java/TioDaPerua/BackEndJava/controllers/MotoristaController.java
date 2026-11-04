@@ -29,6 +29,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/Motorista")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Motorista")
 public class MotoristaController {
 
     @Autowired

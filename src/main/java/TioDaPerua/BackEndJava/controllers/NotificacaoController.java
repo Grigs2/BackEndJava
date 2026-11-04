@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/Notificacao")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Notificacao")
 public class NotificacaoController {
 
     @Autowired

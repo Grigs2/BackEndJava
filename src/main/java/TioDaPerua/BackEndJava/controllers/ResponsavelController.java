@@ -28,6 +28,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/Responsavel")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Responsavel")
 public class ResponsavelController {
 
     @Autowired

@@ -32,12 +32,13 @@ public class ViaCepValidationService implements CepValidationService {
                     .uri("/ws/{cep}/json/", cep)
                     .retrieve()
                     .body(ViaCepResponse.class);
-            if (response == null || response.erro() == null) {
+            if (response != null && Boolean.TRUE.equals(response.erro())) {
+                throw new BusinessException("CEP não encontrado no ViaCEP");
+            }
+            // CEP válido não traz o campo "erro"; traz os dados do endereço.
+            if (response == null || response.cep() == null) {
                 LOGGER.warn("ViaCEP retornou resposta incompleta; endereço ficará pendente de validação.");
                 return StatusValidacaoEndereco.PENDENTE;
-            }
-            if (response.erro()) {
-                throw new BusinessException("CEP não encontrado no ViaCEP");
             }
             return StatusValidacaoEndereco.VALIDADO;
         } catch (RestClientException exception) {
@@ -47,6 +48,7 @@ public class ViaCepValidationService implements CepValidationService {
         }
     }
 
-    private record ViaCepResponse(Boolean erro) {
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    private record ViaCepResponse(Boolean erro, String cep) {
     }
 }

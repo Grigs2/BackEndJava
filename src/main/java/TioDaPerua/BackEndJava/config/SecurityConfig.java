@@ -39,21 +39,28 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationConverter jwtAuthenticationConverter,
-                                                   SecurityJsonExceptionHandler exceptionHandler) throws Exception {
+                                                   SecurityJsonExceptionHandler exceptionHandler,
+                                                   @Value("${app.docs.enabled:false}") boolean docsEnabled) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST,
-                                "/Motorista/Cadastrar", "/Motorista/Autenticar",
-                                "/Responsavel/Cadastrar", "/Responsavel/Autenticar",
-                                "/Escola/Cadastrar", "/Escola/Autenticar",
-                                "/Autenticacao/Entrar", "/Autenticacao/Renovar",
-                                "/Autenticacao/SolicitarRedefinicaoSenha",
-                                "/Autenticacao/RedefinirSenha").permitAll()
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                    if (docsEnabled) {
+                        authorize.requestMatchers(HttpMethod.GET,
+                                "/v3/api-docs", "/v3/api-docs/**",
+                                "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                    }
+                    authorize.requestMatchers(HttpMethod.POST,
+                            "/Motorista/Cadastrar", "/Motorista/Autenticar",
+                            "/Responsavel/Cadastrar", "/Responsavel/Autenticar",
+                            "/Escola/Cadastrar", "/Escola/Autenticar",
+                            "/Autenticacao/Entrar", "/Autenticacao/Renovar",
+                            "/Autenticacao/SolicitarRedefinicaoSenha",
+                            "/Autenticacao/RedefinirSenha").permitAll();
+                    authorize.anyRequest().authenticated();
+                })
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(exceptionHandler)
                         .accessDeniedHandler(exceptionHandler))

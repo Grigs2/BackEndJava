@@ -36,6 +36,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/Admin")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Admin")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdministradorController {
 
