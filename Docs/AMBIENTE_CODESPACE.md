@@ -82,8 +82,11 @@ Aguarde a mensagem de que o ambiente está pronto. Isso pode levar alguns minuto
 No terminal do codespace (`Terminal → New Terminal`), na pasta `/workspaces/BackEndJava`:
 
 ```bash
+chmod +x mvnw
 ./mvnw spring-boot:run
 ```
+
+> O `chmod +x mvnw` é necessário porque o Windows não guarda a permissão de execução do `mvnw` no git. Sem ele aparece `Permission denied`. Basta rodar uma vez por codespace.
 
 Espere aparecer `Started BackEndJavaApplication` (ou similar) nos logs. O Hibernate cria/atualiza as tabelas sozinho (`ddl-auto=update`).
 
@@ -189,7 +192,7 @@ Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` d
 - Codespaces para sozinho após um tempo sem uso (padrão de 30 minutos). Você não perde o código.
 - Para retomar: acesse https://github.com/codespaces, clique no codespace e aguarde ligar.
 - Ao retomar, os processos (`spring-boot:run` e `expo start`) **não sobem sozinhos**. Rode-os de novo.
-- O banco Postgres fica no volume `pgdata`, então os dados sobrevivem a paradas. Para zerar o banco, remova o volume (seção 9).
+- O banco Postgres fica no volume `pgdata`, então os dados sobrevivem a paradas. Para zerar o banco, veja a seção 9.
 - **A URL do backend pode mudar** se você recriar o codespace do backend. Se mudar, atualize `EXPO_PUBLIC_API_URL` no `.env.local` do frontend e reinicie o `expo start`.
 
 ---
@@ -213,8 +216,8 @@ Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` d
 | Frontend abre, mas login/chamadas falham no navegador com erro de CORS | Porta 8080 ou 8081 está **Private**, ou a URL em `.env.local` está errada | Deixe as duas portas **Public**. Confira o `.env.local` e reinicie o `expo start` |
 | Frontend não usa a URL nova | O Expo lê as variáveis só na inicialização | Pare o `expo start` (`Ctrl+C`) e rode de novo |
 | `Port 8080 already in use` no backend | O `spring-boot:run` anterior ainda está rodando | Pare com `Ctrl+C` no terminal antigo, ou use `pkill -f spring-boot` |
-| Backend não conecta no banco | Container `db` parado | Veja `docker compose -f .devcontainer/docker-compose.yml ps` e reinicie com **Codespaces: Rebuild Container** |
-| Quer zerar o banco | Dados antigos no volume | No terminal: `docker compose -f .devcontainer/docker-compose.yml down -v`, depois **Rebuild Container** |
+| Backend não conecta no banco | Container `db` parado ou ainda subindo | Rode o teste de porta da seção "Comandos úteis". Se falhar, use **Codespaces: Rebuild Container** |
+| Quer zerar o banco | Dados antigos no volume | Apague o codespace e crie outro da mesma branch. O volume `pgdata` é removido junto |
 | Mudou o `devcontainer.json` ou o `docker-compose.yml` e nada mudou | Configuração do container não foi reaplicada | `Ctrl+Shift+P` → **Codespaces: Rebuild Container** |
 | `npm install` falha no frontend | Versão do Node | O devcontainer já usa Node 22 (exigido pelo React Native 0.88). Confira com `node -v` |
 | Não sei o nome do codespace | — | Ele aparece na URL do codespace em https://github.com/codespaces, ou na coluna **Forwarded Address** da aba PORTS |
@@ -222,15 +225,12 @@ Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` d
 Comandos úteis no terminal do codespace:
 
 ```bash
-# Status dos containers (backend)
-docker compose -f .devcontainer/docker-compose.yml ps
+# Testa se o Postgres responde na porta 5432 (serviço db)
+timeout 3 bash -c '</dev/tcp/db/5432' && echo "Postgres OK" || echo "Postgres FORA"
 
-# Logs do Postgres
-docker compose -f .devcontainer/docker-compose.yml logs db
-
-# Versão do Node e do Java
-node -v
+# Versão do Java e do Node
 java -version
+node -v
 ```
 
 ---
