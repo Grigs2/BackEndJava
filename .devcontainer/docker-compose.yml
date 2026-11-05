@@ -1,0 +1,31 @@
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/java:1-21
+    volumes:
+      - ..:/workspaces/BackEndJava:cached
+    command: sleep infinity
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/TioDaPerua
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?defina o secret JWT_SECRET_BASE64 no Codespaces}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?defina o secret ADMIN_EMAIL no Codespaces}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina o secret ADMIN_PASSWORD no Codespaces}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+      DOCS_ENABLED: ${DOCS_ENABLED:-true}
+      CORS_ALLOWED_ORIGIN_PATTERNS: https://*.app.github.dev,http://localhost:8081,http://localhost:3000
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: TioDaPerua
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

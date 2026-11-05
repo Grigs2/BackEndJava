@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -11,17 +12,18 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
 
+    private final String[] allowedOriginPatterns;
+
+    public CorsConfig(@Value("${app.cors.allowed-origin-patterns}") String[] allowedOriginPatterns) {
+        this.allowedOriginPatterns = allowedOriginPatterns;
+    }
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         // Habilita CORS para todos os endpoints da API
         registry.addMapping("/**")
-                // Origens permitidas (FrontEnd Web, Expo, etc)
-                .allowedOrigins(
-                    "http://localhost",
-                    "http://localhost:8081",
-                    "http://localhost:19006",
-                    "http://localhost:3000"
-                )
+                // Origens permitidas (FrontEnd Web, Expo, etc), definidas em app.cors.allowed-origin-patterns
+                .allowedOriginPatterns(allowedOriginPatterns)
                 // Métodos HTTP permitidos
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 // Todos os headers são permitidos
