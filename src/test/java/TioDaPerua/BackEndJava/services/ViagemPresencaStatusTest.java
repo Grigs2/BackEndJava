@@ -123,7 +123,8 @@ class ViagemPresencaStatusTest {
         verify(historicoViagemPresencaRepository, never()).save(any(HistoricoViagemPresenca.class));
         verify(notificacaoService, never()).criarNotificacoesAutomaticas(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.<NotificacaoService.Contexto>any());
     }
 
     @Test
@@ -182,8 +183,11 @@ class ViagemPresencaStatusTest {
         service.alterarStatusPresenca(90L, 5L, "EMBARCADO", 100L);
 
         verify(notificacaoService).criarNotificacoesAutomaticas(
-                100L, java.util.Set.of(200L),
-                "Atualização de presença", "O embarque do dependente foi registrado.");
+                org.mockito.ArgumentMatchers.eq(100L), org.mockito.ArgumentMatchers.eq(java.util.Set.of(200L)),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.argThat((NotificacaoService.Contexto c) ->
+                        c.tipo() == TioDaPerua.BackEndJava.enums.TipoNotificacao.EMBARQUE
+                                && Long.valueOf(5L).equals(c.dependenteId())));
     }
 
     private void stubSuccessfulUpdate() {

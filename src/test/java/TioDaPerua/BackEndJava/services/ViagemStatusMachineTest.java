@@ -99,8 +99,11 @@ class ViagemStatusMachineTest {
         service.alterarStatusViagemDia(90L, "CANCELADA", "Imprevisto", 100L);
 
         verify(notificacaoService).criarNotificacoesAutomaticas(
-                100L, java.util.Set.of(200L),
-                "Atualização da viagem", "A viagem foi cancelada.");
+                org.mockito.ArgumentMatchers.eq(100L), org.mockito.ArgumentMatchers.eq(java.util.Set.of(200L)),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.contains("Imprevisto"),
+                org.mockito.ArgumentMatchers.argThat((NotificacaoService.Contexto c) ->
+                        c.tipo() == TioDaPerua.BackEndJava.enums.TipoNotificacao.VIAGEM_CANCELADA));
     }
 
     private ViagemDia execucao(StatusViagemDia status) {

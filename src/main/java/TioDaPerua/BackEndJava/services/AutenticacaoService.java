@@ -25,12 +25,23 @@ public class AutenticacaoService {
     private final JwtTokenService jwtTokenService;
     private final RefreshTokenRepository refreshTokenRepository;
 
+    /** Opcional para manter os testes que constroem o serviço só com as 3 dependências. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TermosService termosService;
+
     public AutenticacaoService(UsuarioService usuarioService,
                                JwtTokenService jwtTokenService,
                                RefreshTokenRepository refreshTokenRepository) {
         this.usuarioService = usuarioService;
         this.jwtTokenService = jwtTokenService;
         this.refreshTokenRepository = refreshTokenRepository;
+    }
+
+    /** Registra o aceite da versão vigente dos termos pelo usuário autenticado. */
+    @Transactional
+    public void aceitarTermos(Long usuarioId) {
+        if (termosService == null) return;
+        usuarioService.registrarAceiteTermos(usuarioId, termosService);
     }
 
     @Transactional
@@ -128,7 +139,8 @@ public class AutenticacaoService {
                 accessDuration.toSeconds(),
                 refreshToken,
                 refreshDuration.toSeconds(),
-                perfil
+                perfil,
+                termosService != null && termosService.termosPendentes(usuario)
         );
     }
 

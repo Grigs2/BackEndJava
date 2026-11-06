@@ -92,6 +92,15 @@ public class UsuarioService {
         return usuarioRepository.save(usuario);
     }
 
+    /** Novo aceite dos termos (versão vigente) pelo próprio usuário. */
+    @Transactional
+    public void registrarAceiteTermos(Long usuarioId, TermosService termosService) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        termosService.registrarAceite(usuario, true);
+        usuarioRepository.save(usuario);
+    }
+
     @Transactional
     public Usuario autenticar(String email, String senha) {
         if (email == null || email.isEmpty() || senha == null || senha.isEmpty()) {

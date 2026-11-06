@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.entities;
 
+import TioDaPerua.BackEndJava.enums.OrigemSolicitacao;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -47,5 +48,14 @@ public class Solicitacao implements Serializable {
 
     @Column(name = "data_fim")
     private LocalDateTime dataFim;
+
+    /** Quem iniciou o pedido; nulo em registros antigos (equivale a MOTORISTA). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origem", length = 20)
+    private OrigemSolicitacao origem;
+
+    public OrigemSolicitacao getOrigemEfetiva() {
+        return origem == null ? OrigemSolicitacao.MOTORISTA : origem;
+    }
 
 }

@@ -35,4 +35,14 @@ public class Viagem implements Serializable {
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;
 
+    /** Escola de destino. Viagens antigas podem não ter escola. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "escola_id")
+    private Escola escola;
+
+    /** Nome exibido da viagem: "Viagem para <escola>". */
+    public String getNome() {
+        return escola != null && escola.getNome() != null ? "Viagem para " + escola.getNome() : null;
+    }
+
 }
