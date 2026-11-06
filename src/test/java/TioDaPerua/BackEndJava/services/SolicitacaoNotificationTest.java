@@ -50,7 +50,8 @@ class SolicitacaoNotificationTest {
         assertTrue(resposta.isAceito());
         verify(viagemDependenteRepository).save(org.mockito.ArgumentMatchers.any());
         verify(notificacaoService).criarNotificacoesAutomaticas(
-                10L, List.of(20L), "Solicitação aceita", "Sua solicitação de transporte foi aceita.");
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(List.of(20L)), org.mockito.ArgumentMatchers.eq("Solicitação aceita"), org.mockito.ArgumentMatchers.eq("Sua solicitação de transporte foi aceita."),
+                org.mockito.ArgumentMatchers.argThat((NotificacaoService.Contexto c) -> c.tipo() == TioDaPerua.BackEndJava.enums.TipoNotificacao.SOLICITACAO));
     }
 
     @Test
@@ -63,7 +64,8 @@ class SolicitacaoNotificationTest {
 
         verify(viagemDependenteRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(notificacaoService).criarNotificacoesAutomaticas(
-                10L, List.of(20L), "Solicitação recusada", "Sua solicitação de transporte foi recusada.");
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(List.of(20L)), org.mockito.ArgumentMatchers.eq("Solicitação recusada"), org.mockito.ArgumentMatchers.eq("Sua solicitação de transporte foi recusada."),
+                org.mockito.ArgumentMatchers.argThat((NotificacaoService.Contexto c) -> c.tipo() == TioDaPerua.BackEndJava.enums.TipoNotificacao.SOLICITACAO));
     }
 
     @Test

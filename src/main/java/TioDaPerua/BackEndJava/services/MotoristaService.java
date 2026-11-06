@@ -39,6 +39,11 @@ public class MotoristaService {
     @Autowired
     private EnderecoOperacionalService enderecoOperacionalService;
 
+    /** Lazy para não criar ciclo de dependência na inicialização (usado só para avisar troca de veículo). */
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private ViagemService viagemService;
+
     public Motorista cadastraMotorista(Motorista motorista) {
         if (motorista == null) throw new IllegalArgumentException("Motorista não pode ser nulo");
         if (motorista.getNome() == null || motorista.getNome().isBlank()) {
@@ -104,12 +109,21 @@ public class MotoristaService {
         if (dadosAlterados) {
             documentoMotoristaService.invalidarDocumentosDoVeiculo(existente.getId());
         }
+        // Mudou o que o responsável usa para reconhecer a van (modelo, placa ou cor)?
+        boolean identificacaoAlterada = !Objects.equals(existente.getModelo(), veiculo.getModelo())
+                || !Objects.equals(existente.getPlaca(), DocumentoFiscalValidator.normalizarPlaca(veiculo.getPlaca()))
+                || !Objects.equals(existente.getCor(), veiculo.getCor());
         existente.setModelo(veiculo.getModelo());
         existente.setPlaca(DocumentoFiscalValidator.normalizarPlaca(veiculo.getPlaca()));
         existente.setAno(veiculo.getAno());
         existente.setCapacidade(veiculo.getCapacidade());
         existente.setCor(veiculo.getCor());
-        return motoristaRepository.save(motorista);
+        Motorista salvo = motoristaRepository.save(motorista);
+        if (identificacaoAlterada && viagemService != null) {
+            // Avisa os responsáveis das viagens de hoje (planejadas ou em andamento).
+            viagemService.notificarTrocaDeVeiculo(salvo);
+        }
+        return salvo;
     }
 
     public Motorista alterarInfos(Motorista motorista) {

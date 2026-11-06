@@ -76,6 +76,15 @@ public class ViagemService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private EscolaRepository escolaRepository;
+
+    @Autowired
+    private NotificacaoRepository notificacaoRepository;
+
+    @Autowired
+    private AusenciaInformadaRepository ausenciaInformadaRepository;
+
     @Transactional(readOnly = true)
     public List<AgendaViagemDTO> agendaMotorista(Long idMotorista) {
         LocalDate inicio = LocalDate.now();
@@ -444,8 +453,36 @@ public class ViagemService {
         }
 
         viagemPresencaRepository.flush();
+        aplicarAusenciasInformadas(viagemDia, dependenteIds);
         materializarParadas(viagemDia, gerarParadasProjetadas(viagemDia), ativos, enderecosPorDependente);
         return viagemDia;
+    }
+
+    /**
+     * Alunos com ausência avisada pelo responsável para a data já entram como FALTOU (o histórico registra o
+     * responsável como autor). O motorista já foi avisado quando a ausência foi registrada.
+     */
+    private void aplicarAusenciasInformadas(ViagemDia viagemDia, List<Long> dependenteIds) {
+        if (dependenteIds.isEmpty() || ausenciaInformadaRepository == null) return;
+        Periodo periodo = viagemDia.getViagem() == null ? null : viagemDia.getViagem().getPeriodo();
+        Map<Long, AusenciaInformada> ausencias = new HashMap<>();
+        for (AusenciaInformada a : ausenciaInformadaRepository.findByDependenteIdInAndData(dependenteIds, viagemDia.getData())) {
+            if (a.valePara(periodo)) ausencias.putIfAbsent(a.getDependente().getId(), a);
+        }
+        if (ausencias.isEmpty()) return;
+        for (ViagemPresenca presenca : viagemPresencaRepository.findByViagemDiaId(viagemDia.getId())) {
+            AusenciaInformada a = ausencias.get(presenca.getDependente().getId());
+            if (a == null || presenca.getStatus() != StatusViagemPresenca.ESPERANDO) continue;
+            marcarFaltaPorAusencia(presenca, a.getInformadaPor().getId());
+        }
+    }
+
+    /** Marca FALTOU por ausência avisada (sem notificar de novo os responsáveis, que foram os autores). */
+    void marcarFaltaPorAusencia(ViagemPresenca presenca, Long responsavelUsuarioId) {
+        presenca.setStatus(StatusViagemPresenca.FALTOU);
+        viagemPresencaRepository.save(presenca);
+        registrarHistoricoViagemPresenca(presenca, StatusViagemPresenca.ESPERANDO, StatusViagemPresenca.FALTOU,
+                responsavelUsuarioId, null, null, Instant.now());
     }
 
     private void materializarParadas(ViagemDia viagemDia,
@@ -641,7 +678,19 @@ public class ViagemService {
     }
 
     public Viagem criarViagem(Long idMotorista, Viagem viagem) {
+        return criarViagem(idMotorista, viagem, null);
+    }
+
+    /**
+     * Cria a viagem do motorista para um período. Com escolaId, a viagem passa a se chamar "Viagem para <escola>"
+     * e só aceita alunos dessa escola.
+     */
+    public Viagem criarViagem(Long idMotorista, Viagem viagem, Long escolaId) {
         if (viagem == null || idMotorista == null) throw new IllegalArgumentException("Dados da viagem e motorista são obrigatórios");
+        if (escolaId != null) {
+            viagem.setEscola(escolaRepository.findById(escolaId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Escola não encontrada com id: " + escolaId)));
+        }
 
         Motorista motorista = motoristaRepository.findById(idMotorista)
                 .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado com id: " + idMotorista));
@@ -709,7 +758,7 @@ public class ViagemService {
         presenca.setStatus(status);
         viagemPresencaRepository.save(presenca);
         registrarHistoricoViagemPresenca(presenca, anterior, status, atorUsuarioId, null, null, Instant.now());
-        notificarResponsaveisDaPresenca(atorUsuarioId, idDependente, status);
+        notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, status);
 
         return gerarParadasViagemDia(idViagemDia);
     }
@@ -797,7 +846,7 @@ public class ViagemService {
         registrarHistoricoViagemPresenca(
                 presenca, atual, evento.statusNovo(), atorUsuarioId, evento.idEvento(),
                 evento.ocorridoEm(), Instant.now());
-        notificarResponsaveisDaPresenca(atorUsuarioId, evento.idDependente(), evento.statusNovo());
+        notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, evento.statusNovo());
 
         return resultadoOffline(evento, StatusEventoSincronizacao.APLICADO, evento.statusNovo(), null);
     }
@@ -819,49 +868,155 @@ public class ViagemService {
     }
 
     private void notificarResponsaveisDaPresenca(
-            Long atorUsuarioId, Long dependenteId, StatusViagemPresenca status) {
-        String mensagem = switch (status) {
-            case EMBARCADO -> "O embarque do dependente foi registrado.";
-            case DESEMBARCADO -> "O desembarque do dependente foi registrado.";
-            case FALTOU -> "A ausência do dependente foi registrada.";
-            case ESPERANDO -> null;
-        };
-        if (mensagem == null) {
-            return;
+            Long atorUsuarioId, ViagemPresenca presenca, ViagemDia viagemDia, StatusViagemPresenca status) {
+        Dependente dependente = presenca.getDependente();
+        Viagem viagem = viagemDia == null ? null : viagemDia.getViagem();
+        MensagensNotificacao.Texto texto;
+        TipoNotificacao tipo;
+        switch (status) {
+            case EMBARCADO -> {
+                texto = MensagensNotificacao.embarque(dependente, viagem, presenca.getHorarioEmbarque());
+                tipo = TipoNotificacao.EMBARQUE;
+            }
+            case DESEMBARCADO -> {
+                texto = MensagensNotificacao.desembarque(dependente, viagem, presenca.getHorarioDesembarque());
+                tipo = TipoNotificacao.DESEMBARQUE;
+            }
+            case FALTOU -> {
+                texto = MensagensNotificacao.falta(dependente, viagem);
+                tipo = TipoNotificacao.AUSENCIA;
+            }
+            default -> {
+                return;
+            }
         }
+        Long dependenteId = dependente == null ? null : dependente.getId();
+        Long viagemDiaId = viagemDia == null ? null : viagemDia.getId();
         List<DependenteResponsavelUsuarioProjection> vinculos =
                 responsavelRepository.findUsuariosAtivosPorDependentes(List.of(dependenteId));
         Set<Long> destinatarioIds = vinculos.stream()
                 .map(DependenteResponsavelUsuarioProjection::getUsuarioId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         notificacaoService.criarNotificacoesAutomaticas(
-                atorUsuarioId, destinatarioIds, "Atualização de presença", mensagem);
+                atorUsuarioId, destinatarioIds, texto.titulo(), texto.mensagem(),
+                new NotificacaoService.Contexto(tipo, viagemDiaId, dependenteId,
+                        "presenca:" + viagemDiaId + ":" + dependenteId + ":" + status.name()));
     }
 
     private void notificarResponsaveisDaExecucao(
-            Long atorUsuarioId, Long idViagemDia, StatusViagemDia status) {
-        String mensagem = switch (status) {
-            case EM_ANDAMENTO -> "A viagem foi iniciada.";
-            case FINALIZADA -> "A viagem foi finalizada.";
-            case CANCELADA -> "A viagem foi cancelada.";
-            case INTERROMPIDA -> "A viagem foi interrompida.";
-            case PLANEJADA -> null;
-        };
-        if (mensagem == null) {
+            Long atorUsuarioId, ViagemDia viagemDia, StatusViagemDia status, String motivo) {
+        Viagem viagem = viagemDia.getViagem();
+        MensagensNotificacao.Texto texto;
+        TipoNotificacao tipo;
+        switch (status) {
+            case EM_ANDAMENTO -> {
+                texto = MensagensNotificacao.aCaminho(viagem);
+                tipo = TipoNotificacao.MOTORISTA_A_CAMINHO;
+            }
+            case FINALIZADA -> {
+                texto = MensagensNotificacao.finalizada(viagem);
+                tipo = TipoNotificacao.VIAGEM_FINALIZADA;
+            }
+            case CANCELADA -> {
+                texto = MensagensNotificacao.cancelada(viagem, motivo);
+                tipo = TipoNotificacao.VIAGEM_CANCELADA;
+            }
+            case INTERROMPIDA -> {
+                texto = MensagensNotificacao.interrompida(viagem, motivo);
+                tipo = TipoNotificacao.VIAGEM_INTERROMPIDA;
+            }
+            default -> {
+                return;
+            }
+        }
+        Long idViagemDia = viagemDia.getId();
+        Set<Long> destinatarioIds = responsaveisDaExecucao(idViagemDia, null);
+        if (destinatarioIds.isEmpty()) {
             return;
         }
+        notificacaoService.criarNotificacoesAutomaticas(
+                atorUsuarioId, destinatarioIds, texto.titulo(), texto.mensagem(),
+                new NotificacaoService.Contexto(tipo, idViagemDia, null, "execucao:" + idViagemDia + ":" + status.name()));
+    }
+
+    /**
+     * Usuários responsáveis pelos alunos da viagem do dia. Com {@code somenteStatus}, só dos alunos nesses status
+     * (ex.: atraso avisa só quem ainda não foi entregue).
+     */
+    private Set<Long> responsaveisDaExecucao(Long idViagemDia, Set<StatusViagemPresenca> somenteStatus) {
         List<Long> dependenteIds = viagemPresencaRepository.findByViagemDiaId(idViagemDia).stream()
+                .filter(p -> somenteStatus == null || somenteStatus.contains(p.getStatus()))
                 .map(presenca -> presenca.getDependente().getId())
                 .distinct()
                 .toList();
         if (dependenteIds.isEmpty()) {
-            return;
+            return Set.of();
         }
-        Set<Long> destinatarioIds = responsavelRepository.findUsuariosAtivosPorDependentes(dependenteIds).stream()
+        return responsavelRepository.findUsuariosAtivosPorDependentes(dependenteIds).stream()
                 .map(DependenteResponsavelUsuarioProjection::getUsuarioId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        notificacaoService.criarNotificacoesAutomaticas(
-                atorUsuarioId, destinatarioIds, "Atualização da viagem", mensagem);
+    }
+
+    /**
+     * O motorista avisa que a viagem do dia está atrasada. Avisa os responsáveis dos alunos ainda não entregues;
+     * no máximo um aviso a cada 10 minutos por viagem.
+     */
+    @Transactional
+    public void avisarAtraso(Long idViagemDia, int minutos, String motivo, Long atorUsuarioId) {
+        if (idViagemDia == null || atorUsuarioId == null) {
+            throw new IllegalArgumentException("Execução e usuário responsável são obrigatórios");
+        }
+        if (minutos < 5 || minutos > 180) {
+            throw new BusinessException("Informe um atraso entre 5 e 180 minutos");
+        }
+        String motivoNormalizado = motivo == null || motivo.isBlank() ? null : motivo.trim();
+        if (motivoNormalizado != null && motivoNormalizado.length() > 200) {
+            throw new BusinessException("O motivo deve ter no máximo 200 caracteres");
+        }
+        ViagemDia viagemDia = viagemDiaRepository.findById(idViagemDia)
+                .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
+        validarAtorMotorista(viagemDia.getViagem(), atorUsuarioId);
+        if (viagemDia.getStatus() != StatusViagemDia.PLANEJADA && viagemDia.getStatus() != StatusViagemDia.EM_ANDAMENTO) {
+            throw new ConflictException("Só é possível avisar atraso em viagem planejada ou em andamento");
+        }
+        if (notificacaoRepository.existsByTipoAndViagemDiaIdAndDataAfter(
+                TipoNotificacao.ATRASO.name(), idViagemDia, LocalDateTime.now().minusMinutes(10))) {
+            throw new ConflictException("Um aviso de atraso desta viagem foi enviado há menos de 10 minutos");
+        }
+        Set<Long> destinatarioIds = responsaveisDaExecucao(idViagemDia,
+                Set.of(StatusViagemPresenca.ESPERANDO, StatusViagemPresenca.EMBARCADO));
+        if (destinatarioIds.isEmpty()) {
+            throw new BusinessException("Não há alunos aguardando ou a bordo para avisar");
+        }
+        MensagensNotificacao.Texto texto = MensagensNotificacao.atraso(viagemDia.getViagem(), minutos, motivoNormalizado);
+        notificacaoService.criarNotificacoesAutomaticas(atorUsuarioId, destinatarioIds, texto.titulo(), texto.mensagem(),
+                new NotificacaoService.Contexto(TipoNotificacao.ATRASO, idViagemDia, null, null));
+    }
+
+    /**
+     * Avisa os responsáveis das viagens de hoje (planejadas ou em andamento) de que o veículo do motorista mudou.
+     * Chamado pelo MotoristaService quando os dados do veículo são alterados.
+     */
+    @Transactional
+    public void notificarTrocaDeVeiculo(Motorista motorista) {
+        if (motorista == null || motorista.getVeiculo() == null || motorista.getUsuario() == null) {
+            return;
+        }
+        Set<Long> destinatarioIds = new LinkedHashSet<>();
+        for (Viagem viagem : viagemRepository.findAtivasByMotoristaId(motorista.getId())) {
+            viagemDiaRepository.findByViagemIdAndData(viagem.getId(), LocalDate.now())
+                    .filter(vd -> vd.getStatus() == StatusViagemDia.PLANEJADA || vd.getStatus() == StatusViagemDia.EM_ANDAMENTO)
+                    .ifPresent(vd -> destinatarioIds.addAll(responsaveisDaExecucao(vd.getId(), null)));
+        }
+        if (destinatarioIds.isEmpty()) {
+            return;
+        }
+        var v = motorista.getVeiculo();
+        MensagensNotificacao.Texto texto = MensagensNotificacao.trocaVeiculo(v.getModelo(), v.getCor(), v.getPlaca());
+        notificacaoService.criarNotificacoesAutomaticas(motorista.getUsuario().getId(), destinatarioIds,
+                texto.titulo(), texto.mensagem(),
+                new NotificacaoService.Contexto(TipoNotificacao.TROCA_VEICULO, null, null,
+                        "veiculo:" + v.getId() + ":" + LocalDate.now() + ":" + v.getPlaca()));
     }
 
     private void registrarHistoricoViagemPresenca(
@@ -949,7 +1104,7 @@ public class ViagemService {
                 || status == StatusViagemDia.INTERROMPIDA) {
             localizacaoViagemAtualRepository.deleteByViagemDiaId(idViagemDia);
         }
-        notificarResponsaveisDaExecucao(atorUsuarioId, idViagemDia, status);
+        notificarResponsaveisDaExecucao(atorUsuarioId, viagemDia, status, motivoNormalizado);
 
         return viagemDia;
     }

@@ -44,6 +44,9 @@ public class ViagemController {
     @Autowired
     private SincronizacaoOfflineService sincronizacaoOfflineService;
 
+    @Autowired
+    private TioDaPerua.BackEndJava.services.HistoricoService historicoService;
+
     @PostMapping("/CriarViagem/{id_motorista}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
     public ResponseEntity<ViagemDTO> CriarViagem(@PathVariable Long id_motorista, @Valid @RequestBody ViagemDTO dto) {
@@ -51,7 +54,7 @@ public class ViagemController {
             return ResponseEntity.badRequest().build();
         }
         Viagem entity = ViagemDTO.toEntity(dto);
-        Viagem salva = viagemService.criarViagem(id_motorista, entity);
+        Viagem salva = viagemService.criarViagem(id_motorista, entity, dto.escolaId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ViagemDTO.toDTO(salva));
     }
 
@@ -92,11 +95,28 @@ public class ViagemController {
 
     @GetMapping("/Historico/{idMotorista}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
-    public ResponseEntity<List<ViagemDiaDTO>> Historico(@PathVariable Long idMotorista) {
+    public ResponseEntity<List<ViagemDiaResumoDTO>> Historico(
+            @PathVariable Long idMotorista,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate de,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ate) {
         if (idMotorista == null) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(viagemService.historicoViagens(idMotorista));
+        // Sem datas: último ano (antes devolvia tudo). Mais recentes primeiro.
+        java.time.LocalDate fim = ate == null ? java.time.LocalDate.now() : ate;
+        java.time.LocalDate inicio = de == null ? fim.minusDays(365) : de;
+        return ResponseEntity.ok(historicoService.doMotorista(idMotorista, inicio, fim));
+    }
+
+    /** O motorista avisa atraso da viagem do dia; os responsáveis dos alunos ainda não entregues são notificados. */
+    @PostMapping("/ViagemDia/{idViagemDia}/Atraso")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaExecucao(authentication, #p0)")
+    public ResponseEntity<Void> avisarAtraso(
+            @PathVariable Long idViagemDia,
+            @Valid @RequestBody AvisoAtrasoDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        viagemService.avisarAtraso(idViagemDia, dto.minutos(), dto.motivo(), Long.valueOf(jwt.getSubject()));
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/ConsultarMotorista/{idViagemDia}")
@@ -137,7 +157,11 @@ public class ViagemController {
                 viagem.getId(),
                 viagem.getMotorista() != null ? viagem.getMotorista().getNome() : null,
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
-                dependentes
+                dependentes,
+                viagem.getEscola() != null ? viagem.getEscola().getId() : null,
+                viagem.getEscola() != null ? viagem.getEscola().getNome() : null,
+                viagem.getNome(),
+                viagem.getAtivo()
         ));
     }
 
@@ -152,11 +176,13 @@ public class ViagemController {
 
     @GetMapping("/DependentesDisponiveis/{id_viagem}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
-    public ResponseEntity<List<DependenteDTO>> DependentesDisponiveis(@PathVariable Long id_viagem) {
+    public ResponseEntity<List<DependenteDTO>> DependentesDisponiveis(
+            @PathVariable Long id_viagem,
+            @RequestParam(required = false) String nome) {
         if (id_viagem == null) {
             return ResponseEntity.badRequest().build();
         }
-        List<DependenteDTO> dependentes = solicitacaoService.listarDependentesDisponiveis(id_viagem).stream()
+        List<DependenteDTO> dependentes = solicitacaoService.listarDependentesDisponiveis(id_viagem, nome).stream()
                 .map(DependenteDTO::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dependentes);
@@ -164,11 +190,15 @@ public class ViagemController {
 
     @PostMapping("/SolicitarDependente/{id_viagem}/{id_dependente}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
-    public ResponseEntity<SolicitacaoDTO> SolicitarDependente(@PathVariable Long id_viagem, @PathVariable Long id_dependente) {
+    public ResponseEntity<SolicitacaoDTO> SolicitarDependente(
+            @PathVariable Long id_viagem,
+            @PathVariable Long id_dependente,
+            @AuthenticationPrincipal Jwt jwt) {
         if (id_viagem == null || id_dependente == null) {
             return ResponseEntity.badRequest().build();
         }
-        Solicitacao solicitacao = solicitacaoService.solicitarDependente(id_viagem, id_dependente);
+        Solicitacao solicitacao = solicitacaoService.solicitarDependente(
+                id_viagem, id_dependente, jwt == null ? null : Long.valueOf(jwt.getSubject()));
         return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacao));
     }
 

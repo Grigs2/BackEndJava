@@ -22,4 +22,17 @@ public class AsyncConfig {
         executor.setAwaitTerminationSeconds(10);
         return executor;
     }
+
+    /** Envio de push (PushService): fila própria para não disputar threads com os e-mails. */
+    @Bean("pushExecutor")
+    public Executor pushExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("push-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        return executor;
+    }
 }

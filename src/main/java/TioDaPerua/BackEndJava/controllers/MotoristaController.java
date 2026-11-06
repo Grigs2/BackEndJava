@@ -44,6 +44,29 @@ public class MotoristaController {
     @Autowired
     private VinculoEscolaService vinculoEscolaService;
 
+    @Autowired
+    private TioDaPerua.BackEndJava.services.SolicitacaoService solicitacaoService;
+
+    /** Solicitações sem resposta das viagens do motorista: convites enviados e pedidos de vaga recebidos. */
+    @GetMapping("/{idMotorista}/Solicitacoes")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
+    public ResponseEntity<List<TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO>> listarSolicitacoes(@PathVariable Long idMotorista) {
+        return ResponseEntity.ok(solicitacaoService.listarDoMotorista(idMotorista).stream()
+                .map(TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO::toDTO)
+                .toList());
+    }
+
+    /** O motorista aceita ou recusa um pedido de vaga feito pelo responsável. */
+    @PostMapping("/Solicitacoes/{idSolicitacao}/Responder")
+    @PreAuthorize("hasRole('MOTORISTA')")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO> responderSolicitacao(
+            @PathVariable Long idSolicitacao,
+            @Valid @RequestBody TioDaPerua.BackEndJava.DTOs.ResponderSolicitacaoDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO.toDTO(solicitacaoService.responderComoMotorista(
+                idSolicitacao, dto.aceito(), Long.valueOf(jwt.getSubject()))));
+    }
+
     @GetMapping("/Perfil")
     @PreAuthorize("hasRole('MOTORISTA')")
     public ResponseEntity<MotoristaDTO> consultarPerfil(@AuthenticationPrincipal Jwt jwt) {

@@ -52,6 +52,77 @@ public class ResponsavelController {
     @Autowired
     private RedeResponsaveisService redeResponsaveisService;
 
+    @Autowired
+    private TioDaPerua.BackEndJava.services.BuscaMotoristaService buscaMotoristaService;
+
+    @Autowired
+    private TioDaPerua.BackEndJava.services.HistoricoService historicoService;
+
+    @Autowired
+    private TioDaPerua.BackEndJava.services.AusenciaService ausenciaService;
+
+    /** Histórico de viagens do aluno (padrão: últimos 30 dias; datas em AAAA-MM-DD). */
+    @GetMapping("/Dependente/{idDependente}/Historico")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<List<HistoricoAlunoDTO>> historicoDoAluno(
+            @PathVariable Long idDependente,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate de,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ate) {
+        return ResponseEntity.ok(historicoService.doAluno(idDependente, de, ate));
+    }
+
+    /** Ausências avisadas a partir de hoje. */
+    @GetMapping("/Dependente/{idDependente}/Ausencias")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<List<AusenciaDTO>> listarAusencias(@PathVariable Long idDependente) {
+        return ResponseEntity.ok(ausenciaService.listar(idDependente));
+    }
+
+    /** Avisa que o aluno não vai em uma data (trecho TODOS, IDA ou VOLTA). O motorista é notificado. */
+    @PostMapping("/Dependente/{idDependente}/Ausencias")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<AusenciaDTO> avisarAusencia(
+            @PathVariable Long idDependente,
+            @Valid @RequestBody AusenciaDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ausenciaService.registrar(
+                idDependente, Long.valueOf(jwt.getSubject()), dto.data(), dto.trecho(), dto.motivo()));
+    }
+
+    /** Cancela a ausência enquanto a viagem daquele dia ainda não foi preparada. */
+    @DeleteMapping("/Dependente/{idDependente}/Ausencias/{idAusencia}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<Void> cancelarAusencia(@PathVariable Long idDependente, @PathVariable Long idAusencia) {
+        ausenciaService.cancelar(idDependente, idAusencia);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Busca motoristas por nome e/ou proximidade (mesmo bairro/cidade do aluno ou do responsável).
+     * Ex.: GET /Responsavel/3/Motoristas/Buscar?nome=jo&idDependente=7&somenteProximos=true
+     */
+    @GetMapping("/{idResponsavel}/Motoristas/Buscar")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavel(authentication, #p0)")
+    public ResponseEntity<List<MotoristaDisponivelDTO>> buscarMotoristas(
+            @PathVariable Long idResponsavel,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) Long idDependente,
+            @RequestParam(defaultValue = "false") boolean somenteProximos) {
+        return ResponseEntity.ok(buscaMotoristaService.buscar(idResponsavel, nome, idDependente, somenteProximos));
+    }
+
+    /** O responsável pede vaga para o dependente em uma viagem; o motorista responde. */
+    @PostMapping("/SolicitarTransporte/{idViagem}/{idDependente}")
+    @PreAuthorize("#p1 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p1)")
+    public ResponseEntity<SolicitacaoDTO> solicitarTransporte(
+            @PathVariable Long idViagem,
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        Solicitacao solicitacao = solicitacaoService.solicitarPeloResponsavel(
+                idViagem, idDependente, Long.valueOf(jwt.getSubject()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(SolicitacaoDTO.toDTO(solicitacao));
+    }
+
     @GetMapping("/Perfil")
     @PreAuthorize("hasRole('RESPONSAVEL')")
     public ResponseEntity<ResponsavelDTO> consultarPerfil(@AuthenticationPrincipal Jwt jwt) {

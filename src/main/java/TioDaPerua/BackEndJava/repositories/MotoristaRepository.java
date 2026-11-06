@@ -23,6 +23,13 @@ public interface MotoristaRepository extends JpaRepository<Motorista, Long> {
 
     Optional<Motorista> findByCpf(String cpf);
 
+    /** Motoristas com conta ativa e veículo cadastrado, para a busca do responsável. */
+    @Query("SELECT mot FROM Motorista mot JOIN FETCH mot.usuario usu "
+            + "LEFT JOIN FETCH usu.enderecoOperacional JOIN FETCH mot.veiculo "
+            + "WHERE usu.contaSuspensa IS NULL OR usu.contaSuspensa = false "
+            + "ORDER BY mot.nome")
+    java.util.List<Motorista> findAtivosComVeiculo();
+
     boolean existsByIdAndUsuario_Id(Long motoristaId, Long usuarioId);
 
     boolean existsByCpf(String cpf);
