@@ -62,6 +62,13 @@ public class AutenticacaoController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Aceite da versão vigente dos Termos de Uso e da Política de Privacidade (quando termosPendentes = true). */
+    @PostMapping("/AceitarTermos")
+    public ResponseEntity<Void> aceitarTermos(@AuthenticationPrincipal Jwt jwt) {
+        autenticacaoService.aceitarTermos(Long.valueOf(jwt.getSubject()));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/AlterarSenha")
     public ResponseEntity<Void> alterarSenha(@Valid @RequestBody AlterarSenhaDTO dto,
                                              @AuthenticationPrincipal Jwt jwt) {

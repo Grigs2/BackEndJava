@@ -26,6 +26,9 @@ public class NotificacaoController {
     @Autowired
     private UsuarioService usuarioService;
 
+    @Autowired
+    private TioDaPerua.BackEndJava.services.PushService pushService;
+
     @PostMapping("/Enviar")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isUsuarioAutenticado(authentication, #p0.remetenteId())")
     public ResponseEntity<NotificacaoDTO> Enviar(@Valid @RequestBody NotificacaoDTO dto) {
@@ -41,11 +44,23 @@ public class NotificacaoController {
 
     @GetMapping("/Listar/{id_usuario}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isUsuarioAutenticado(authentication, #p0)")
-    public ResponseEntity<List<NotificacaoDTO>> Listar(@PathVariable Long id_usuario) {
+    public ResponseEntity<List<NotificacaoDTO>> Listar(
+            @PathVariable Long id_usuario,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String grupo,
+            @RequestParam(required = false) Integer pagina,
+            @RequestParam(required = false) Integer tamanho) {
         if (id_usuario == null) {
             return ResponseEntity.badRequest().build();
         }
-        List<NotificacaoDTO> notificacoes = notificacaoService.listarNaoVistasPorUsuario(id_usuario).stream()
+        // Sem parâmetros mantém o comportamento antigo (todas as não lidas). Com parâmetros: central paginada,
+        // status=TODAS|NAO_LIDAS, grupo=VIAGEM|ALERTA|SOLICITACAO|AVISO, pagina a partir de 0.
+        boolean central = status != null || grupo != null || pagina != null || tamanho != null;
+        List<TioDaPerua.BackEndJava.entities.Notificacao> encontradas = central
+                ? notificacaoService.listar(id_usuario, !"TODAS".equalsIgnoreCase(status), grupo,
+                        pagina == null ? 0 : pagina, tamanho == null ? NotificacaoService.TAMANHO_PAGINA_PADRAO : tamanho)
+                : notificacaoService.listarNaoVistasPorUsuario(id_usuario);
+        List<NotificacaoDTO> notificacoes = encontradas.stream()
                 .map(n -> {
                     UsuarioResumoDTO remetenteResumo = usuarioService.getUsuarioResumo(n.getRemetente());
                     return NotificacaoDTO.toDTO(n, remetenteResumo);
@@ -61,6 +76,44 @@ public class NotificacaoController {
             return ResponseEntity.badRequest().build();
         }
         notificacaoService.visualizarNotificacao(id_notificacao);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Contador do sino: quantas notificações não lidas o usuário autenticado tem. */
+    @GetMapping("/NaoLidas/Contagem")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<java.util.Map<String, Long>> contarNaoLidas(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        return ResponseEntity.ok(java.util.Map.of("naoLidas",
+                notificacaoService.contarNaoLidas(Long.valueOf(jwt.getSubject()))));
+    }
+
+    /** Marca todas as notificações do usuário autenticado como lidas. */
+    @PutMapping("/MarcarTodasLidas")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<java.util.Map<String, Integer>> marcarTodasLidas(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        return ResponseEntity.ok(java.util.Map.of("marcadas",
+                notificacaoService.marcarTodasLidas(Long.valueOf(jwt.getSubject()))));
+    }
+
+    /** Registra o aparelho do usuário autenticado para receber push. Corpo: { expoToken, plataforma }. */
+    @PostMapping("/Dispositivos")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> registrarDispositivo(
+            @Valid @RequestBody TioDaPerua.BackEndJava.DTOs.DispositivoPushDTO dto,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        pushService.registrar(Long.valueOf(jwt.getSubject()), dto.expoToken(), dto.plataforma());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Para de enviar push para o aparelho (ao sair da conta). Corpo: { expoToken }. */
+    @PostMapping("/Dispositivos/Remover")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> removerDispositivo(
+            @Valid @RequestBody TioDaPerua.BackEndJava.DTOs.DispositivoPushDTO dto,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        pushService.remover(Long.valueOf(jwt.getSubject()), dto.expoToken());
         return ResponseEntity.noContent().build();
     }
 

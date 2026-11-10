@@ -53,6 +53,8 @@ public class SecurityConfig {
                                 "/v3/api-docs", "/v3/api-docs/**",
                                 "/swagger-ui.html", "/swagger-ui/**").permitAll();
                     }
+                    // Termos de Uso e Política de Privacidade: versão vigente e PDF são públicos.
+                    authorize.requestMatchers(HttpMethod.GET, "/Termos/vigente", "/termos/**").permitAll();
                     authorize.requestMatchers(HttpMethod.POST,
                             "/Motorista/Cadastrar", "/Motorista/Autenticar",
                             "/Responsavel/Cadastrar", "/Responsavel/Autenticar",

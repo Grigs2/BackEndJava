@@ -4,8 +4,13 @@ import TioDaPerua.BackEndJava.entities.Notificacao;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+
 import java.time.LocalDateTime;
 
+/**
+ * Notificação. Os campos tipo, prioridade, viagemDiaId, dependenteId e lidaEm são preenchidos pelo servidor
+ * (avisos automáticos) e ignorados quando o DTO chega como corpo de um aviso manual.
+ */
 public record NotificacaoDTO(Long id,
                             @NotBlank String titulo,
                             @NotBlank String mensagem,
@@ -13,7 +18,12 @@ public record NotificacaoDTO(Long id,
                             boolean visto,
                             UsuarioResumoDTO remetente,
                             @NotNull @Positive Long remetenteId,
-                            @NotNull @Positive Long destinatarioId) {
+                            @NotNull @Positive Long destinatarioId,
+                            String tipo,
+                            String prioridade,
+                            Long viagemDiaId,
+                            Long dependenteId,
+                            LocalDateTime lidaEm) {
 
     public static NotificacaoDTO toDTO(Notificacao n, UsuarioResumoDTO remetenteResumo) {
         if (n == null) return null;
@@ -25,7 +35,12 @@ public record NotificacaoDTO(Long id,
                 n.getVisto() != null ? n.getVisto() : false,
                 remetenteResumo,
                 n.getRemetente() != null ? n.getRemetente().getId() : null,
-                n.getDestinatario() != null ? n.getDestinatario().getId() : null
+                n.getDestinatario() != null ? n.getDestinatario().getId() : null,
+                n.getTipo() != null ? n.getTipo() : "GERAL",
+                n.getPrioridade() != null ? n.getPrioridade() : "NORMAL",
+                n.getViagemDiaId(),
+                n.getDependenteId(),
+                n.getLidaEm()
         );
     }
 
