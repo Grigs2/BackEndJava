@@ -15,7 +15,9 @@ import TioDaPerua.BackEndJava.repositories.DependenteRepository;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.SolicitacaoRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemEscolaRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemRepository;
+import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,6 +46,7 @@ class SolicitacaoBidirecionalTest {
     @Mock private ViagemDependenteRepository viagemDependenteRepository;
     @Mock private NotificacaoService notificacaoService;
     @Mock private ResponsavelRepository responsavelRepository;
+    @Mock private ViagemEscolaRepository viagemEscolaRepository;
     @InjectMocks private SolicitacaoService service;
 
     private static final long USUARIO_RESPONSAVEL = 10L;
@@ -62,7 +65,10 @@ class SolicitacaoBidirecionalTest {
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
         when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Solicitacao s = service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL);
+        when(viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(1L, 4L, List.of(StatusVinculoEscola.ATIVO)))
+                .thenReturn(true);
+
+        Solicitacao s = service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true);
 
         assertEquals(OrigemSolicitacao.RESPONSAVEL, s.getOrigem());
         assertEquals(responsavel, s.getResponsavel());
@@ -81,7 +87,7 @@ class SolicitacaoBidirecionalTest {
         when(viagemRepository.findById(3L)).thenReturn(Optional.of(viagem));
 
         BusinessException e = assertThrows(BusinessException.class,
-                () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL));
+                () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true));
         assertTrue(e.getMessage().contains("Colégio Sol"));
         verify(solicitacaoRepository, never()).save(any());
     }
@@ -95,7 +101,7 @@ class SolicitacaoBidirecionalTest {
         when(responsavelRepository.findByUsuarioId(USUARIO_RESPONSAVEL)).thenReturn(Optional.of(responsavel));
         when(dependenteRepository.findById(7L)).thenReturn(Optional.of(dependente));
 
-        assertThrows(AccessDeniedException.class, () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL));
+        assertThrows(AccessDeniedException.class, () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true));
     }
 
     @Test
@@ -112,7 +118,7 @@ class SolicitacaoBidirecionalTest {
         when(solicitacaoRepository.findPendenteByDependenteAndViagem(7L, 3L)).thenReturn(Optional.empty());
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.of(vinculo));
 
-        assertThrows(ConflictException.class, () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL));
+        assertThrows(ConflictException.class, () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true));
     }
 
     @Test
@@ -153,7 +159,51 @@ class SolicitacaoBidirecionalTest {
         Solicitacao s = solicitacaoAberta(OrigemSolicitacao.RESPONSAVEL);
         when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
 
-        assertThrows(BusinessException.class, () -> service.responderSolicitacao(5L, true, USUARIO_RESPONSAVEL));
+        assertThrows(BusinessException.class, () -> service.responderSolicitacao(5L, true, true, USUARIO_RESPONSAVEL));
+        verify(viagemDependenteRepository, never()).save(any());
+    }
+
+    @Test
+    void pedidoSemConfirmarCompartilhamentoNaoEnviaSolicitacao() {
+        assertThrows(BusinessException.class,
+                () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, false));
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    void pedidoNaoEnviadoSeMotoristaNaoTemVinculoAtivoComAEscola() {
+        Responsavel responsavel = responsavel();
+        Escola escola = escola(1L, "EMEF Pedro II");
+        Dependente dependente = dependente(responsavel, escola);
+        when(responsavelRepository.findByUsuarioId(USUARIO_RESPONSAVEL)).thenReturn(Optional.of(responsavel));
+        when(dependenteRepository.findById(7L)).thenReturn(Optional.of(dependente));
+        when(viagemRepository.findById(3L)).thenReturn(Optional.of(viagem(escola)));
+        when(solicitacaoRepository.findPendenteByDependenteAndViagem(7L, 3L)).thenReturn(Optional.empty());
+        when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
+
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true));
+        assertTrue(e.getMessage().contains("vínculo ativo"));
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    void motoristaNaoRespondeSolicitacaoExpirada() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.RESPONSAVEL);
+        s.setStatus(TioDaPerua.BackEndJava.enums.StatusSolicitacao.PENDENTE);
+        s.setDataExpiracao(java.time.LocalDateTime.now().minusDays(1));
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+
+        BusinessException e = assertThrows(BusinessException.class,
+                () -> service.responderComoMotorista(5L, true, USUARIO_MOTORISTA));
+        assertTrue(e.getMessage().contains("expirou"));
+        verify(viagemDependenteRepository, never()).save(any());
+    }
+
+    @Test
+    void responsavelNaoAceitaSemConfirmarCompartilhamento() {
+        assertThrows(BusinessException.class,
+                () -> service.responderSolicitacao(5L, true, false, USUARIO_RESPONSAVEL));
         verify(viagemDependenteRepository, never()).save(any());
     }
 
@@ -169,6 +219,9 @@ class SolicitacaoBidirecionalTest {
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
         when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        when(viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(1L, 4L, List.of(StatusVinculoEscola.ATIVO)))
+                .thenReturn(true);
+
         Solicitacao s = service.solicitarDependente(3L, 7L, USUARIO_MOTORISTA);
 
         assertEquals(OrigemSolicitacao.MOTORISTA, s.getOrigem());
@@ -178,7 +231,7 @@ class SolicitacaoBidirecionalTest {
     }
 
     @Test
-    void alunosDisponiveisFiltramPorEscolaDaViagemENomeSemAcento() {
+    void alunosDisponiveisFiltramApenasPelaEscolaDaViagem() {
         Escola escola = escola(1L, "EMEF Pedro II");
         Viagem viagem = viagem(escola);
         Dependente enzo = dependente(responsavel(), escola);
@@ -189,8 +242,7 @@ class SolicitacaoBidirecionalTest {
         when(viagemRepository.findById(3L)).thenReturn(Optional.of(viagem));
         when(dependenteRepository.findDisponiveisParaViagem(3L)).thenReturn(List.of(enzo, joao, outraEscola));
 
-        assertEquals(List.of(enzo, joao), service.listarDependentesDisponiveis(3L, null));
-        assertEquals(List.of(joao), service.listarDependentesDisponiveis(3L, "joao"));
+        assertEquals(List.of(enzo, joao), service.listarDependentesDisponiveis(3L));
     }
 
     private Solicitacao solicitacaoAberta(OrigemSolicitacao origem) {
@@ -229,7 +281,7 @@ class SolicitacaoBidirecionalTest {
         Viagem v = new Viagem();
         v.setId(3L);
         v.setMotorista(motorista);
-        v.setEscola(escola);
+        v.setEscolas(List.of(escola));
         v.setAtivo(true);
         return v;
     }

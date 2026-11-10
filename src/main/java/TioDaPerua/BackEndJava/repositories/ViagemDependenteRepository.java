@@ -29,9 +29,32 @@ public interface ViagemDependenteRepository extends JpaRepository<ViagemDependen
     @Query("SELECT vd FROM ViagemDependente vd WHERE vd.dependente.id = :dependenteId AND vd.ativo = true")
     List<ViagemDependente> findAtivosByDependenteId(Long dependenteId);
 
+    /** Acordo ativo entre o responsável e o motorista: algum dependente do responsável está em viagem ativa dele. */
+    @Query("""
+        SELECT COUNT(vd) > 0 FROM ViagemDependente vd
+        JOIN vd.dependente d
+        JOIN d.responsaveis r
+        WHERE vd.ativo = true
+        AND r.id = :responsavelId
+        AND vd.viagem.motorista.id = :motoristaId
+    """)
+    boolean existeAcordoAtivo(@org.springframework.data.repository.query.Param("responsavelId") Long responsavelId,
+                              @org.springframework.data.repository.query.Param("motoristaId") Long motoristaId);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE ViagemDependente vd SET vd.ativo = false WHERE vd.viagem.id = :viagemId")
     void desativarPorViagemId(Long viagemId);
+
+    /** Encerra os acordos do motorista com os dependentes que estudam na escola informada. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+        UPDATE ViagemDependente vd SET vd.ativo = false
+        WHERE vd.ativo = true
+        AND vd.viagem.id IN (SELECT v.id FROM Viagem v WHERE v.motorista.id = :motoristaId)
+        AND vd.dependente.id IN (SELECT d.id FROM Dependente d WHERE d.escola.id = :escolaId)
+    """)
+    int desativarAcordosDoMotoristaNaEscola(@org.springframework.data.repository.query.Param("motoristaId") Long motoristaId,
+                                            @org.springframework.data.repository.query.Param("escolaId") Long escolaId);
 
     @Query("""
         SELECT DISTINCT vd

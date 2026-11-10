@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,7 +27,7 @@ class MensagensNotificacaoTest {
         motorista.setNome("Carlos Alberto Lima");
         motorista.setVeiculo(veiculo);
         Viagem v = new Viagem();
-        v.setEscola(escola);
+        v.setEscolas(List.of(escola));
         v.setMotorista(motorista);
         v.setPeriodo(periodo);
         return v;
@@ -57,13 +58,13 @@ class MensagensNotificacaoTest {
     @Test
     void canceladaIncluiMotivoENomeDaViagem() {
         var t = MensagensNotificacao.cancelada(viagem(Periodo.MANHA_IDA), "Pneu furado");
-        assertEquals("A Viagem para EMEF Pedro II (Manhã · ida) de hoje foi cancelada: Pneu furado. Providencie outro transporte.",
+        assertEquals("A Viagem para escola(s): EMEF Pedro II (Manhã · ida) de hoje foi cancelada: Pneu furado. Providencie outro transporte.",
                 t.mensagem());
     }
 
     @Test
     void atrasoEAusenciaInformada() {
-        assertEquals("A Viagem para EMEF Pedro II (Tarde · ida) está cerca de 15 min atrasada.",
+        assertEquals("A Viagem para escola(s): EMEF Pedro II (Tarde · ida) está cerca de 15 min atrasada.",
                 MensagensNotificacao.atraso(viagem(Periodo.TARDE_IDA), 15, " ").mensagem());
         LocalDate hoje = LocalDate.of(2026, 11, 6);
         String quando = AusenciaService.descricaoQuando("IDA", hoje.plusDays(1), hoje);

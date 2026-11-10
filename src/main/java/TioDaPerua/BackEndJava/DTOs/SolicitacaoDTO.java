@@ -21,7 +21,10 @@ public record SolicitacaoDTO(Long id,
                             String viagemPeriodo,
                             Long motoristaId,
                             String motoristaNome,
-                            String responsavelNome) {
+                            String responsavelNome,
+                            String status,
+                            LocalDateTime dataExpiracao,
+                            Boolean compartilhamentoAutorizado) {
 
     public static SolicitacaoDTO toDTO(Solicitacao s) {
         if (s == null) return null;
@@ -42,7 +45,10 @@ public record SolicitacaoDTO(Long id,
                 viagem != null && viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 motorista != null ? motorista.getId() : null,
                 motorista != null ? motorista.getNome() : null,
-                s.getResponsavel() != null ? s.getResponsavel().getNome() : null
+                s.getResponsavel() != null ? s.getResponsavel().getNome() : null,
+                s.getStatusEfetivo().name(),
+                s.getDataExpiracao(),
+                s.getCompartilhamentoAutorizado()
         );
     }
 

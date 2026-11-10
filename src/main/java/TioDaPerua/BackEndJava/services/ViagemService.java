@@ -677,19 +677,22 @@ public class ViagemService {
                 .toList();
     }
 
+    /**
+     * Cria a viagem do motorista para um período. Com escolaIds, a viagem atende essas escolas,
+     * tem nome padrão de ida/volta e só aceita alunos de uma delas.
+     */
     public Viagem criarViagem(Long idMotorista, Viagem viagem) {
         return criarViagem(idMotorista, viagem, null);
     }
-
-    /**
-     * Cria a viagem do motorista para um período. Com escolaId, a viagem passa a se chamar "Viagem para <escola>"
-     * e só aceita alunos dessa escola.
-     */
-    public Viagem criarViagem(Long idMotorista, Viagem viagem, Long escolaId) {
+    public Viagem criarViagem(Long idMotorista, Viagem viagem, List<Long> escolaIds) {
         if (viagem == null || idMotorista == null) throw new IllegalArgumentException("Dados da viagem e motorista são obrigatórios");
-        if (escolaId != null) {
-            viagem.setEscola(escolaRepository.findById(escolaId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Escola não encontrada com id: " + escolaId)));
+        if (escolaIds != null && !escolaIds.isEmpty()) {
+            List<Long> idsUnicos = escolaIds.stream().distinct().toList();
+            List<Escola> escolas = escolaRepository.findAllById(idsUnicos);
+            if (escolas.size() != idsUnicos.size()) {
+                throw new ResourceNotFoundException("Escola não encontrada entre os ids: " + idsUnicos);
+            }
+            viagem.setEscolas(new ArrayList<>(escolas));
         }
 
         Motorista motorista = motoristaRepository.findById(idMotorista)
@@ -705,6 +708,15 @@ public class ViagemService {
         }
 
         viagem.setMotorista(motorista);
+        return viagemRepository.save(viagem);
+    }
+
+    /** Edita o nome da viagem; vazio volta ao nome padrão de ida/volta. */
+    @Transactional
+    public Viagem atualizarNome(Long idViagem, String nome) {
+        Viagem viagem = viagemRepository.findById(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
+        viagem.setNome(nome);
         return viagemRepository.save(viagem);
     }
 

@@ -45,7 +45,7 @@ class SolicitacaoNotificationTest {
         when(viagemDependenteRepository.save(org.mockito.ArgumentMatchers.any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Solicitacao resposta = service.responderSolicitacao(5L, true, 10L);
+        Solicitacao resposta = service.responderSolicitacao(5L, true, true, 10L);
 
         assertTrue(resposta.isAceito());
         verify(viagemDependenteRepository).save(org.mockito.ArgumentMatchers.any());
@@ -60,7 +60,7 @@ class SolicitacaoNotificationTest {
         when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(solicitacao));
         when(solicitacaoRepository.save(solicitacao)).thenReturn(solicitacao);
 
-        service.responderSolicitacao(5L, false, 10L);
+        service.responderSolicitacao(5L, false, null, 10L);
 
         verify(viagemDependenteRepository, never()).save(org.mockito.ArgumentMatchers.any());
         verify(notificacaoService).criarNotificacoesAutomaticas(
@@ -75,7 +75,7 @@ class SolicitacaoNotificationTest {
         solicitacao.setAceito(true);
         when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(solicitacao));
 
-        assertThrows(ConflictException.class, () -> service.responderSolicitacao(5L, true, 10L));
+        assertThrows(ConflictException.class, () -> service.responderSolicitacao(5L, true, true, 10L));
 
         verifyNoInteractions(notificacaoService);
     }

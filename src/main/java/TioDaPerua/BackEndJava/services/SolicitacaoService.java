@@ -1,12 +1,16 @@
 package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.entities.Dependente;
+import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.Responsavel;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
 import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.entities.ViagemDependente;
+import TioDaPerua.BackEndJava.entities.ViagemEscola;
 import TioDaPerua.BackEndJava.enums.OrigemSolicitacao;
+import TioDaPerua.BackEndJava.enums.StatusSolicitacao;
+import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import TioDaPerua.BackEndJava.enums.TipoNotificacao;
 import TioDaPerua.BackEndJava.repositories.*;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
@@ -32,8 +36,14 @@ import java.util.Optional;
 @Service
 public class SolicitacaoService {
 
+    /** Prazo para o destinatário responder uma solicitação. */
+    public static final int PRAZO_RESPOSTA_DIAS = 3;
+
     @Autowired
     private SolicitacaoRepository solicitacaoRepository;
+
+    @Autowired
+    private ViagemEscolaRepository viagemEscolaRepository;
 
     @Autowired
     private DependenteRepository dependenteRepository;
@@ -50,23 +60,17 @@ public class SolicitacaoService {
     @Autowired
     private ResponsavelRepository responsavelRepository;
 
-    public List<Dependente> listarDependentesDisponiveis(Long idViagem) {
-        return listarDependentesDisponiveis(idViagem, null);
-    }
-
     /**
      * Alunos que o motorista pode convidar para a viagem: com escola, fora da viagem e sem pedido pendente.
-     * Se a viagem tem escola, só alunos dessa escola. O filtro por nome ignora maiúsculas e acentos.
+     * Se a viagem tem escola, só alunos dessa escola. Não há filtro por nome, para não expor a identidade do aluno.
      */
     @Transactional(readOnly = true)
-    public List<Dependente> listarDependentesDisponiveis(Long idViagem, String nome) {
+    public List<Dependente> listarDependentesDisponiveis(Long idViagem) {
         Viagem viagem = viagemRepository.findById(idViagem)
                 .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
-        Long escolaId = viagem.getEscola() != null ? viagem.getEscola().getId() : null;
-        String filtro = normalizar(nome);
+        List<Long> escolaIds = viagem.getEscolas().stream().map(Escola::getId).toList();
         return dependenteRepository.findDisponiveisParaViagem(idViagem).stream()
-                .filter(d -> escolaId == null || (d.getEscola() != null && escolaId.equals(d.getEscola().getId())))
-                .filter(d -> filtro.isEmpty() || normalizar(d.getNome()).contains(filtro))
+                .filter(d -> escolaIds.isEmpty() || (d.getEscola() != null && escolaIds.contains(d.getEscola().getId())))
                 .toList();
     }
 
@@ -97,9 +101,12 @@ public class SolicitacaoService {
             throw new BusinessException("Dependente não possui responsáveis vinculados");
         }
 
+        LocalDateTime agora = LocalDateTime.now();
         solicitacao.setRespondido(false);
         solicitacao.setAceito(false);
-        solicitacao.setDataInicio(LocalDateTime.now());
+        solicitacao.setStatus(StatusSolicitacao.PENDENTE);
+        solicitacao.setDataInicio(agora);
+        solicitacao.setDataExpiracao(agora.plusDays(PRAZO_RESPOSTA_DIAS));
         solicitacao.setOrigem(OrigemSolicitacao.MOTORISTA);
 
         Solicitacao salva = solicitacaoRepository.save(solicitacao);
@@ -116,11 +123,18 @@ public class SolicitacaoService {
         return salva;
     }
 
-    /** Pedido de vaga feito pelo responsável do aluno; o motorista da viagem é avisado e responde. */
+    /**
+     * Pedido de vaga feito pelo responsável do aluno; o motorista da viagem é avisado e responde.
+     * O responsável precisa confirmar que, se o motorista aceitar, os dados do dependente serão compartilhados.
+     */
     @Transactional
-    public Solicitacao solicitarPeloResponsavel(Long idViagem, Long idDependente, Long atorUsuarioId) {
+    public Solicitacao solicitarPeloResponsavel(Long idViagem, Long idDependente, Long atorUsuarioId,
+                                                Boolean compartilhamentoAutorizado) {
         if (idViagem == null || idDependente == null || atorUsuarioId == null) {
             throw new BusinessException("Viagem, dependente e usuário autenticado são obrigatórios");
+        }
+        if (!Boolean.TRUE.equals(compartilhamentoAutorizado)) {
+            throw new BusinessException("Confirme que, se o motorista aceitar, os dados do dependente serão compartilhados com ele");
         }
         Responsavel responsavel = responsavelRepository.findByUsuarioId(atorUsuarioId)
                 .orElseThrow(() -> new AccessDeniedException("Somente responsáveis podem pedir vaga"));
@@ -145,7 +159,11 @@ public class SolicitacaoService {
         solicitacao.setResponsavel(responsavel);
         solicitacao.setRespondido(false);
         solicitacao.setAceito(false);
-        solicitacao.setDataInicio(LocalDateTime.now());
+        solicitacao.setStatus(StatusSolicitacao.PENDENTE);
+        solicitacao.setCompartilhamentoAutorizado(true);
+        LocalDateTime agora = LocalDateTime.now();
+        solicitacao.setDataInicio(agora);
+        solicitacao.setDataExpiracao(agora.plusDays(PRAZO_RESPOSTA_DIAS));
         solicitacao.setOrigem(OrigemSolicitacao.RESPONSAVEL);
         Solicitacao salva = solicitacaoRepository.save(solicitacao);
 
@@ -161,12 +179,20 @@ public class SolicitacaoService {
         return salva;
     }
 
-    /** Resposta do responsável a um convite feito pelo motorista. */
+    /**
+     * Resposta do responsável a um convite feito pelo motorista.
+     * Aceitar exige confirmar o compartilhamento dos dados do(s) dependente(s) com o motorista.
+     */
     @Transactional
-    public Solicitacao responderSolicitacao(Long idSolicitacao, boolean aceito, Long atorUsuarioId) {
+    public Solicitacao responderSolicitacao(Long idSolicitacao, boolean aceito, Boolean compartilhamentoAutorizado,
+                                            Long atorUsuarioId) {
         if (idSolicitacao == null || atorUsuarioId == null) {
             throw new BusinessException("Solicitação e usuário autenticado são obrigatórios");
         }
+        if (aceito && !Boolean.TRUE.equals(compartilhamentoAutorizado)) {
+            throw new BusinessException("Para aceitar, confirme que os dados do dependente serão compartilhados com o motorista");
+        }
+        expirarVencidas();
         Solicitacao solicitacao = solicitacaoRepository.findById(idSolicitacao)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com id: " + idSolicitacao));
 
@@ -174,6 +200,7 @@ public class SolicitacaoService {
                 || !atorUsuarioId.equals(solicitacao.getResponsavel().getUsuario().getId())) {
             throw new AccessDeniedException("Somente o responsável da solicitação pode respondê-la");
         }
+        verificarPrazo(solicitacao);
         if (solicitacao.isRespondido()) {
             throw new ConflictException("Solicitação já foi respondida");
         }
@@ -181,6 +208,9 @@ public class SolicitacaoService {
             throw new BusinessException("Este pedido foi feito por você e aguarda a resposta do motorista");
         }
 
+        if (aceito) {
+            solicitacao.setCompartilhamentoAutorizado(true);
+        }
         Solicitacao salva = registrarResposta(solicitacao, aceito);
         Usuario usuarioMotorista = solicitacao.getViagem() == null
                 || solicitacao.getViagem().getMotorista() == null
@@ -206,6 +236,7 @@ public class SolicitacaoService {
         if (idSolicitacao == null || atorUsuarioId == null) {
             throw new BusinessException("Solicitação e usuário autenticado são obrigatórios");
         }
+        expirarVencidas();
         Solicitacao solicitacao = solicitacaoRepository.findById(idSolicitacao)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitação não encontrada com id: " + idSolicitacao));
         Usuario usuarioMotorista = solicitacao.getViagem() == null || solicitacao.getViagem().getMotorista() == null
@@ -213,6 +244,7 @@ public class SolicitacaoService {
         if (usuarioMotorista == null || !atorUsuarioId.equals(usuarioMotorista.getId())) {
             throw new AccessDeniedException("Somente o motorista da viagem pode responder este pedido");
         }
+        verificarPrazo(solicitacao);
         if (solicitacao.isRespondido()) {
             throw new ConflictException("Solicitação já foi respondida");
         }
@@ -238,31 +270,57 @@ public class SolicitacaoService {
     }
 
     /** Solicitações em aberto das viagens do motorista (convites enviados e pedidos recebidos). */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Solicitacao> listarDoMotorista(Long idMotorista) {
+        expirarVencidas();
         return solicitacaoRepository.findAbertasByMotoristaId(idMotorista);
+    }
+
+    /** Marca como EXPIRADA as solicitações sem resposta cujo prazo de 3 dias já passou. */
+    void expirarVencidas() {
+        solicitacaoRepository.expirarVencidas(LocalDateTime.now(), StatusSolicitacao.EXPIRADA);
+    }
+
+    private void verificarPrazo(Solicitacao solicitacao) {
+        if (solicitacao.getStatusEfetivo() == StatusSolicitacao.EXPIRADA
+                || solicitacao.isExpiradaEm(LocalDateTime.now())) {
+            throw new BusinessException("Esta solicitação expirou. O prazo para resposta é de "
+                    + PRAZO_RESPOSTA_DIAS + " dias");
+        }
     }
 
     private Solicitacao registrarResposta(Solicitacao solicitacao, boolean aceito) {
         solicitacao.setRespondido(true);
         solicitacao.setAceito(aceito);
+        solicitacao.setStatus(aceito ? StatusSolicitacao.ACEITA : StatusSolicitacao.RECUSADA);
         if (aceito) {
-            ViagemDependente vinculo = new ViagemDependente();
-            vinculo.setViagem(solicitacao.getViagem());
-            vinculo.setDependente(solicitacao.getDependente());
-            vinculo.setAtivo(true);
-            viagemDependenteRepository.save(vinculo);
+            abrirAcordo(solicitacao);
         }
         return solicitacaoRepository.save(solicitacao);
+    }
+
+    /**
+     * Acordo de transporte do dependente na viagem: é um ViagemDependente ativo, criado ou reativado ao aceitar.
+     */
+    private void abrirAcordo(Solicitacao solicitacao) {
+        ViagemDependente vinculo = viagemDependenteRepository
+                .findByViagemIdAndDependenteId(solicitacao.getViagem().getId(), solicitacao.getDependente().getId())
+                .orElseGet(ViagemDependente::new);
+        vinculo.setViagem(solicitacao.getViagem());
+        vinculo.setDependente(solicitacao.getDependente());
+        vinculo.setAtivo(true);
+        viagemDependenteRepository.save(vinculo);
     }
 
     private void validarAlunoParaViagem(Viagem viagem, Dependente dependente) {
         if (dependente.getEscola() == null) {
             throw new BusinessException("Dependente deve estar vinculado a uma escola para solicitar transporte");
         }
-        if (viagem.getEscola() != null && !Objects.equals(viagem.getEscola().getId(), dependente.getEscola().getId())) {
-            throw new BusinessException("Esta viagem vai para " + viagem.getEscola().getNome()
-                    + ", e o aluno estuda em outra escola");
+        if (!viagem.getEscolas().isEmpty() && viagem.getEscolas().stream()
+                .noneMatch(e -> Objects.equals(e.getId(), dependente.getEscola().getId()))) {
+            String atendidas = viagem.getEscolas().stream().map(Escola::getNome).collect(java.util.stream.Collectors.joining(", "));
+            throw new BusinessException("Esta viagem atende " + atendidas
+                    + ", e o aluno estuda em " + dependente.getEscola().getNome());
         }
         Optional<Solicitacao> existente = solicitacaoRepository.findPendenteByDependenteAndViagem(dependente.getId(), viagem.getId());
         if (existente.isPresent()) {
@@ -273,6 +331,12 @@ public class SolicitacaoService {
                 .orElse(false);
         if (jaNaViagem) {
             throw new ConflictException("O aluno já faz parte desta viagem");
+        }
+        Long motoristaId = viagem.getMotorista() != null ? viagem.getMotorista().getId() : null;
+        boolean vinculoAtivo = motoristaId != null && viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(
+                dependente.getEscola().getId(), motoristaId, List.of(StatusVinculoEscola.ATIVO));
+        if (!vinculoAtivo) {
+            throw new BusinessException("O motorista não tem vínculo ativo com a escola " + dependente.getEscola().getNome());
         }
     }
 

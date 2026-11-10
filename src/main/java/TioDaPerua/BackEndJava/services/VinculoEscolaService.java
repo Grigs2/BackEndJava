@@ -18,6 +18,7 @@ import TioDaPerua.BackEndJava.repositories.EscolaRepository;
 import TioDaPerua.BackEndJava.repositories.HistoricoVinculoEscolaRepository;
 import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemEscolaRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -42,17 +43,23 @@ public class VinculoEscolaService {
     private final UsuarioRepository usuarioRepository;
     private final ViagemEscolaRepository vinculoRepository;
     private final HistoricoVinculoEscolaRepository historicoRepository;
+    private final ViagemDependenteRepository viagemDependenteRepository;
+    private final DocumentoMotoristaService documentoMotoristaService;
 
     public VinculoEscolaService(EscolaRepository escolaRepository,
                                 MotoristaRepository motoristaRepository,
                                 UsuarioRepository usuarioRepository,
                                 ViagemEscolaRepository vinculoRepository,
-                                HistoricoVinculoEscolaRepository historicoRepository) {
+                                HistoricoVinculoEscolaRepository historicoRepository,
+                                ViagemDependenteRepository viagemDependenteRepository,
+                                DocumentoMotoristaService documentoMotoristaService) {
         this.escolaRepository = escolaRepository;
         this.motoristaRepository = motoristaRepository;
         this.usuarioRepository = usuarioRepository;
         this.vinculoRepository = vinculoRepository;
         this.historicoRepository = historicoRepository;
+        this.viagemDependenteRepository = viagemDependenteRepository;
+        this.documentoMotoristaService = documentoMotoristaService;
     }
 
     @Transactional(readOnly = true)
@@ -138,6 +145,9 @@ public class VinculoEscolaService {
         ViagemEscola vinculo = buscarVinculoParaAtualizacao(vinculoId);
         Usuario ator = validarEscolaDoVinculo(vinculo, usuarioEscolaId);
         validarEstado(vinculo, StatusVinculoEscola.PENDENTE_ESCOLA);
+        if (aprovado) {
+            validarDocumentosDoMotorista(vinculo.getMotorista());
+        }
         alterarEstado(vinculo, aprovado ? StatusVinculoEscola.ATIVO : StatusVinculoEscola.RECUSADO,
                 ator, motivoObrigatorioSeAplicavel(motivo, !aprovado, "recusar"));
         return VinculoEscolaDTO.toDTO(vinculo);
@@ -161,6 +171,7 @@ public class VinculoEscolaService {
         validarEstado(vinculo, StatusVinculoEscola.ATIVO);
         alterarEstado(vinculo, StatusVinculoEscola.SUSPENSO,
                 ator, motivoObrigatorioSeAplicavel(motivo, true, "suspender"));
+        encerrarAcordosDoVinculo(vinculo);
         return VinculoEscolaDTO.toDTO(vinculo);
     }
 
@@ -184,7 +195,24 @@ public class VinculoEscolaService {
         }
         alterarEstado(vinculo, StatusVinculoEscola.ENCERRADO,
                 ator, motivoObrigatorioSeAplicavel(motivo, true, "encerrar"));
+        encerrarAcordosDoVinculo(vinculo);
         return VinculoEscolaDTO.toDTO(vinculo);
+    }
+
+    /** Sem vínculo ativo com a escola, os acordos do motorista com os alunos dela deixam de valer. */
+    private void encerrarAcordosDoVinculo(ViagemEscola vinculo) {
+        viagemDependenteRepository.desativarAcordosDoMotoristaNaEscola(
+                vinculo.getMotorista().getId(), vinculo.getEscola().getId());
+    }
+
+    private void validarDocumentosDoMotorista(Motorista motorista) {
+        if (motorista.getVeiculo() == null) {
+            throw new BusinessException("O motorista precisa cadastrar um veículo antes de ser aprovado pela escola");
+        }
+        List<String> pendencias = documentoMotoristaService.listarPendenciasParaInicio(motorista.getId());
+        if (!pendencias.isEmpty()) {
+            throw new BusinessException("Não é possível aprovar o motorista. " + String.join("; ", pendencias));
+        }
     }
 
     @Transactional(readOnly = true)

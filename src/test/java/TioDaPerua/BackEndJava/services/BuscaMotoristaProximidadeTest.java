@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class BuscaMotoristaProximidadeTest {
 
     private static BuscaMotoristaService.Referencia texto(String endereco) {
-        return BuscaMotoristaService.Referencia.texto(SolicitacaoService.normalizar(endereco));
+        return BuscaMotoristaService.Referencia.texto(SolicitacaoService.normalizar(endereco), null);
     }
 
     @Test
@@ -16,6 +16,17 @@ class BuscaMotoristaProximidadeTest {
         assertEquals(BuscaMotoristaService.MESMO_BAIRRO, BuscaMotoristaService.proximidade("Centro", "Sao Paulo", ref));
         assertEquals(BuscaMotoristaService.MESMA_CIDADE, BuscaMotoristaService.proximidade("Ipiranga", "São Paulo", ref));
         assertEquals(BuscaMotoristaService.OUTRA_CIDADE, BuscaMotoristaService.proximidade("Centro", "Santo André", ref));
+    }
+
+    @Test
+    void enderecoTextoSemCidadeUsaCidadeDaEscolaDoDependente() {
+        var ref = BuscaMotoristaService.Referencia.texto(
+                SolicitacaoService.normalizar("Rua Vergueiro, 1000 - Vila Mariana"),
+                SolicitacaoService.normalizar("São Paulo"));
+        assertEquals(BuscaMotoristaService.MESMA_CIDADE,
+                BuscaMotoristaService.proximidade("Jardim Vila Mariana", "São Paulo", ref));
+        assertEquals(BuscaMotoristaService.OUTRA_CIDADE,
+                BuscaMotoristaService.proximidade("Centro", "Santo André", ref));
     }
 
     @Test

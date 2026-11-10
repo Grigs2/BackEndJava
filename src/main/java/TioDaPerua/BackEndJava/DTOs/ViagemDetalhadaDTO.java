@@ -6,8 +6,7 @@ public record ViagemDetalhadaDTO(Long id,
                                 String motoristaNome,
                                 String periodo,
                                 List<DependenteResumoDTO> dependentes,
-                                Long escolaId,
-                                String escolaNome,
+                                List<EscolaResumoDTO> escolas,
                                 String nome,
                                 Boolean ativo) {
 }

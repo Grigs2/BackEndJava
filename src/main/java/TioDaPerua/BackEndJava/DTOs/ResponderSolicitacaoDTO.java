@@ -2,6 +2,9 @@ package TioDaPerua.BackEndJava.DTOs;
 
 import jakarta.validation.constraints.NotNull;
 
-/** Resposta do motorista a um pedido de transporte feito pelo responsável. */
-public record ResponderSolicitacaoDTO(@NotNull Boolean aceito) {
+/**
+ * Resposta a uma solicitação de transporte.
+ * compartilhamentoAutorizado é obrigatório para o responsável aceitar um convite do motorista.
+ */
+public record ResponderSolicitacaoDTO(@NotNull Boolean aceito, Boolean compartilhamentoAutorizado) {
 }

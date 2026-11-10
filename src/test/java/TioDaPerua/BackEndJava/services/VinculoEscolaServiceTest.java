@@ -7,6 +7,7 @@ import TioDaPerua.BackEndJava.entities.HistoricoVinculoEscola;
 import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.ViagemEscola;
+import TioDaPerua.BackEndJava.entities.Veiculo;
 import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import TioDaPerua.BackEndJava.exceptions.ConflictException;
@@ -14,6 +15,7 @@ import TioDaPerua.BackEndJava.repositories.EscolaRepository;
 import TioDaPerua.BackEndJava.repositories.HistoricoVinculoEscolaRepository;
 import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemEscolaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,8 @@ class VinculoEscolaServiceTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private ViagemEscolaRepository vinculoRepository;
     @Mock private HistoricoVinculoEscolaRepository historicoRepository;
+    @Mock private ViagemDependenteRepository viagemDependenteRepository;
+    @Mock private DocumentoMotoristaService documentoMotoristaService;
 
     private VinculoEscolaService service;
     private Escola escola;
@@ -62,7 +66,8 @@ class VinculoEscolaServiceTest {
     void setUp() {
         service = new VinculoEscolaService(
                 escolaRepository, motoristaRepository, usuarioRepository,
-                vinculoRepository, historicoRepository);
+                vinculoRepository, historicoRepository,
+                viagemDependenteRepository, documentoMotoristaService);
         escolaUsuario = usuario(ESCOLA_USUARIO_ID, "ESCOLA");
         motoristaUsuario = usuario(MOTORISTA_USUARIO_ID, "MOTORISTA");
 
@@ -217,6 +222,38 @@ class VinculoEscolaServiceTest {
         assertEquals(StatusVinculoEscola.SUSPENSO, historicoCaptor.getValue().getStatusAnterior());
         assertEquals(StatusVinculoEscola.ATIVO, historicoCaptor.getValue().getStatusNovo());
         assertNull(historicoCaptor.getValue().getMotivo());
+    }
+
+    @Test
+    void approvalIsBlockedWhileDriverDocumentsArePending() {
+        ViagemEscola vinculo = vinculo(30L, StatusVinculoEscola.PENDENTE_ESCOLA);
+        motorista.setVeiculo(new Veiculo());
+        when(vinculoRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(vinculo));
+        when(escolaRepository.findByUsuarioId(ESCOLA_USUARIO_ID)).thenReturn(Optional.of(escola));
+        when(usuarioRepository.findById(ESCOLA_USUARIO_ID)).thenReturn(Optional.of(escolaUsuario));
+        when(documentoMotoristaService.listarPendenciasParaInicio(motorista.getId()))
+                .thenReturn(List.of("Documento CNH pendente, recusado ou vencido"));
+
+        assertThrows(BusinessException.class,
+                () -> service.responderComoEscola(ESCOLA_USUARIO_ID, 30L, true, null));
+
+        assertEquals(StatusVinculoEscola.PENDENTE_ESCOLA, vinculo.getStatus());
+        verify(vinculoRepository, never()).save(any(ViagemEscola.class));
+    }
+
+    @Test
+    void suspendingTheLinkEndsAgreementsWithTheSchoolStudents() {
+        ViagemEscola vinculo = vinculo(30L, StatusVinculoEscola.ATIVO);
+        when(vinculoRepository.findByIdForUpdate(30L)).thenReturn(Optional.of(vinculo));
+        when(escolaRepository.findByUsuarioId(ESCOLA_USUARIO_ID)).thenReturn(Optional.of(escola));
+        when(usuarioRepository.findById(ESCOLA_USUARIO_ID)).thenReturn(Optional.of(escolaUsuario));
+        stubHistoricoSave();
+        doAnswer(invocation -> invocation.getArgument(0))
+                .when(vinculoRepository).save(any(ViagemEscola.class));
+
+        service.suspender(ESCOLA_USUARIO_ID, 30L, "Documentação vencida");
+
+        verify(viagemDependenteRepository).desativarAcordosDoMotoristaNaEscola(motorista.getId(), escola.getId());
     }
 
     private ViagemEscola vinculo(Long id, StatusVinculoEscola status) {

@@ -30,6 +30,16 @@ public interface ViagemEscolaRepository extends JpaRepository<ViagemEscola, Long
             @Param("escolaIds") Collection<Long> escolaIds,
             @Param("status") StatusVinculoEscola status);
 
+    /** Motoristas com vínculo ATIVO com pelo menos uma das escolas informadas. */
+    @Query("""
+        SELECT DISTINCT v.motorista.id FROM ViagemEscola v
+        WHERE v.escola.id IN :escolaIds
+        AND v.status = :status
+    """)
+    List<Long> listarIdsMotoristasAtivosDasEscolas(
+            @Param("escolaIds") Collection<Long> escolaIds,
+            @Param("status") StatusVinculoEscola status);
+
     @Query("SELECT v FROM ViagemEscola v JOIN FETCH v.escola JOIN FETCH v.motorista "
             + "WHERE v.motorista.id = :motoristaId AND v.status IS NOT NULL ORDER BY v.criadoEm DESC")
     List<ViagemEscola> listarDoMotorista(@Param("motoristaId") Long motoristaId);

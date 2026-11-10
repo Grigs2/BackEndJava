@@ -113,6 +113,11 @@ public class ResponsavelService {
 
     @Transactional
     public Responsavel cadastrarDependente(Long idResponsavel, Dependente dependente) {
+        return cadastrarDependente(idResponsavel, dependente, null);
+    }
+
+    @Transactional
+    public Responsavel cadastrarDependente(Long idResponsavel, Dependente dependente, Long idEscola) {
         if (idResponsavel == null || dependente == null) throw new IllegalArgumentException("IDs de responsável e dependente são obrigatórios");
         if (dependente.getDataNascimento() != null && dependente.getDataNascimento().isAfter(java.time.LocalDate.now())) {
             throw new BusinessException("A data de nascimento do dependente não pode estar no futuro");
@@ -131,6 +136,11 @@ public class ResponsavelService {
 
         if (responsavelExistente.getUsuario() == null) {
             throw new BusinessException("Responsável sem usuário associado não pode cadastrar dependente");
+        }
+        if (idEscola != null) {
+            Escola escola = escolaRepository.findById(idEscola)
+                    .orElseThrow(() -> new ResourceNotFoundException("Escola não encontrada com id: " + idEscola));
+            dependente.setEscola(escola);
         }
         if (responsavelExistente.getDependentes() != null) {
             if (!responsavelExistente.getDependentes().contains(dependente)) {

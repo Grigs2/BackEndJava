@@ -1,6 +1,7 @@
 package TioDaPerua.BackEndJava.entities;
 
 import TioDaPerua.BackEndJava.enums.OrigemSolicitacao;
+import TioDaPerua.BackEndJava.enums.StatusSolicitacao;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -54,8 +55,30 @@ public class Solicitacao implements Serializable {
     @Column(name = "origem", length = 20)
     private OrigemSolicitacao origem;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private StatusSolicitacao status;
+
+    /** Responsável autorizou que os dados do(s) dependente(s) sejam compartilhados com o motorista se aceitar. */
+    @Column(name = "compartilhamento_autorizado")
+    private Boolean compartilhamentoAutorizado;
+
+    /** Prazo para resposta (3 dias após a criação). Nulo em registros antigos, que não expiram. */
+    @Column(name = "data_expiracao")
+    private LocalDateTime dataExpiracao;
+
     public OrigemSolicitacao getOrigemEfetiva() {
         return origem == null ? OrigemSolicitacao.MOTORISTA : origem;
+    }
+
+    public StatusSolicitacao getStatusEfetivo() {
+        if (status != null) return status;
+        if (!respondido) return StatusSolicitacao.PENDENTE;
+        return aceito ? StatusSolicitacao.ACEITA : StatusSolicitacao.RECUSADA;
+    }
+
+    public boolean isExpiradaEm(LocalDateTime momento) {
+        return !respondido && dataExpiracao != null && momento.isAfter(dataExpiracao);
     }
 
 }

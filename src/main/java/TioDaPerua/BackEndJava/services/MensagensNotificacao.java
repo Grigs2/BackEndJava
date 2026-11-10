@@ -66,8 +66,8 @@ public final class MensagensNotificacao {
 
     public static Texto desembarque(Dependente d, Viagem v, LocalDateTime quando) {
         String aluno = primeiroNome(d == null ? null : d.getNome(), "O aluno");
-        String escola = v != null && v.getEscola() != null ? v.getEscola().getNome()
-                : d != null && d.getEscola() != null ? d.getEscola().getNome() : null;
+        String escola = d != null && d.getEscola() != null ? d.getEscola().getNome()
+                : v != null && v.getEscolas().size() == 1 ? v.getEscolas().get(0).getNome() : null;
         String local = ida(v) ? (escola != null ? " na " + escola : " na escola") : " em casa";
         return new Texto("Desembarque confirmado", aluno + " foi entregue" + local + hora(quando) + ".");
     }

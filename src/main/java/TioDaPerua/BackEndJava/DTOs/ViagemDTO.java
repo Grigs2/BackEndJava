@@ -4,16 +4,17 @@ import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 /**
- * Viagem do motorista. Na criação, informe periodo e escolaId; nome e escolaNome são preenchidos pelo servidor
- * ("Viagem para <escola>").
+ * Viagem do motorista. Na criação, informe periodo e escolas (ids); nome é opcional e, se vazio,
+ * o servidor usa "Viagem para escola(s): ..." (ida) ou "Viagem de volta das escola(s): ..." (volta).
  */
 public record ViagemDTO(Long id,
                        Long motoristaId,
                        @NotBlank String periodo,
                        Boolean ativo,
-                       Long escolaId,
-                       String escolaNome,
+                       List<EscolaResumoDTO> escolas,
                        String nome) {
 
     public static ViagemDTO toDTO(Viagem viagem) {
@@ -23,8 +24,7 @@ public record ViagemDTO(Long id,
                 viagem.getMotorista() != null ? viagem.getMotorista().getId() : null,
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 viagem.getAtivo(),
-                viagem.getEscola() != null ? viagem.getEscola().getId() : null,
-                viagem.getEscola() != null ? viagem.getEscola().getNome() : null,
+                viagem.getEscolas().stream().map(e -> new EscolaResumoDTO(e.getId(), e.getNome())).toList(),
                 viagem.getNome()
         );
     }
@@ -39,6 +39,7 @@ public record ViagemDTO(Long id,
         if (dto.ativo() != null) {
             viagem.setAtivo(dto.ativo());
         }
+        viagem.setNome(dto.nome());
         return viagem;
     }
 }

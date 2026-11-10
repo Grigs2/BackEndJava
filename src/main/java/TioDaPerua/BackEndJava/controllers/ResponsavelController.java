@@ -61,6 +61,9 @@ public class ResponsavelController {
     @Autowired
     private TioDaPerua.BackEndJava.services.AusenciaService ausenciaService;
 
+    @Autowired
+    private TioDaPerua.BackEndJava.services.AvaliacaoService avaliacaoService;
+
     /** Histórico de viagens do aluno (padrão: últimos 30 dias; datas em AAAA-MM-DD). */
     @GetMapping("/Dependente/{idDependente}/Historico")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
@@ -117,10 +120,28 @@ public class ResponsavelController {
     public ResponseEntity<SolicitacaoDTO> solicitarTransporte(
             @PathVariable Long idViagem,
             @PathVariable Long idDependente,
+            @Valid @RequestBody TioDaPerua.BackEndJava.DTOs.SolicitarTransporteDTO dto,
             @AuthenticationPrincipal Jwt jwt) {
         Solicitacao solicitacao = solicitacaoService.solicitarPeloResponsavel(
-                idViagem, idDependente, Long.valueOf(jwt.getSubject()));
+                idViagem, idDependente, Long.valueOf(jwt.getSubject()), dto.compartilhamentoAutorizado());
         return ResponseEntity.status(HttpStatus.CREATED).body(SolicitacaoDTO.toDTO(solicitacao));
+    }
+
+    /** Avaliação do motorista pelo responsável; exige acordo de transporte ativo entre eles. */
+    @PostMapping("/AvaliarMotorista/{idMotorista}")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<AvaliacaoDTO> avaliarMotorista(
+            @PathVariable Long idMotorista,
+            @Valid @RequestBody AvaliarMotoristaDTO dto,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(avaliacaoService.avaliar(
+                Long.valueOf(jwt.getSubject()), idMotorista, dto.nota(), dto.comentario()));
+    }
+
+    @GetMapping("/Motorista/{idMotorista}/Avaliacoes")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<AvaliacaoDTO.Resumo> avaliacoesDoMotorista(@PathVariable Long idMotorista) {
+        return ResponseEntity.ok(avaliacaoService.resumo(idMotorista));
     }
 
     @GetMapping("/Perfil")
@@ -308,7 +329,8 @@ public class ResponsavelController {
             return ResponseEntity.badRequest().build();
         }
         Dependente entity = DependenteDTO.toEntity(dto);
-        Responsavel responsavel = responsavelService.cadastrarDependente(id_Responsavel, entity);
+        Responsavel responsavel = responsavelService.cadastrarDependente(id_Responsavel, entity,
+                dto.escola() != null ? dto.escola().id() : null);
         return ResponseEntity.ok(ResponsavelDTO.toDTO(responsavel));
     }
 
@@ -345,13 +367,13 @@ public class ResponsavelController {
     @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDaSolicitacao(authentication, #p0)")
     public ResponseEntity<SolicitacaoDTO> ResponderSolicitacao(
             @PathVariable Long id_solicitacao,
-            @Valid @RequestBody SolicitacaoDTO dto,
+            @Valid @RequestBody TioDaPerua.BackEndJava.DTOs.ResponderSolicitacaoDTO dto,
             @AuthenticationPrincipal Jwt jwt) {
         if (id_solicitacao == null || dto == null) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(SolicitacaoDTO.toDTO(solicitacaoService.responderSolicitacao(
-                id_solicitacao, dto.aceito(), Long.valueOf(jwt.getSubject()))));
+                id_solicitacao, dto.aceito(), dto.compartilhamentoAutorizado(), Long.valueOf(jwt.getSubject()))));
     }
 
     @GetMapping("/ListarEscolas")

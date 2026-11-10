@@ -54,8 +54,19 @@ public class ViagemController {
             return ResponseEntity.badRequest().build();
         }
         Viagem entity = ViagemDTO.toEntity(dto);
-        Viagem salva = viagemService.criarViagem(id_motorista, entity, dto.escolaId());
+        List<Long> escolaIds = dto.escolas() == null ? List.of()
+                : dto.escolas().stream().map(EscolaResumoDTO::id).toList();
+        Viagem salva = viagemService.criarViagem(id_motorista, entity, escolaIds);
         return ResponseEntity.status(HttpStatus.CREATED).body(ViagemDTO.toDTO(salva));
+    }
+
+    @PutMapping("/AtualizarNome/{idViagem}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
+    public ResponseEntity<ViagemDTO> AtualizarNome(@PathVariable Long idViagem, @RequestBody NomeViagemDTO dto) {
+        if (idViagem == null || dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ViagemDTO.toDTO(viagemService.atualizarNome(idViagem, dto.nome())));
     }
 
     @GetMapping("/ListarViagens/{idMotorista}")
@@ -158,8 +169,7 @@ public class ViagemController {
                 viagem.getMotorista() != null ? viagem.getMotorista().getNome() : null,
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 dependentes,
-                viagem.getEscola() != null ? viagem.getEscola().getId() : null,
-                viagem.getEscola() != null ? viagem.getEscola().getNome() : null,
+                viagem.getEscolas().stream().map(e -> new EscolaResumoDTO(e.getId(), e.getNome())).toList(),
                 viagem.getNome(),
                 viagem.getAtivo()
         ));
@@ -176,14 +186,13 @@ public class ViagemController {
 
     @GetMapping("/DependentesDisponiveis/{id_viagem}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
-    public ResponseEntity<List<DependenteDTO>> DependentesDisponiveis(
-            @PathVariable Long id_viagem,
-            @RequestParam(required = false) String nome) {
+    public ResponseEntity<List<DependenteAnonimoDTO>> DependentesDisponiveis(
+            @PathVariable Long id_viagem) {
         if (id_viagem == null) {
             return ResponseEntity.badRequest().build();
         }
-        List<DependenteDTO> dependentes = solicitacaoService.listarDependentesDisponiveis(id_viagem, nome).stream()
-                .map(DependenteDTO::toDTO)
+        List<DependenteAnonimoDTO> dependentes = solicitacaoService.listarDependentesDisponiveis(id_viagem).stream()
+                .map(DependenteAnonimoDTO::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dependentes);
     }

@@ -3,15 +3,18 @@ package TioDaPerua.BackEndJava.services;
 import TioDaPerua.BackEndJava.DTOs.MotoristaDisponivelDTO;
 import TioDaPerua.BackEndJava.DTOs.ViagemDTO;
 import TioDaPerua.BackEndJava.entities.Dependente;
+import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.EnderecoDependente;
 import TioDaPerua.BackEndJava.entities.EnderecoOperacional;
 import TioDaPerua.BackEndJava.entities.Motorista;
 import TioDaPerua.BackEndJava.entities.Responsavel;
+import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.repositories.DependenteRepository;
 import TioDaPerua.BackEndJava.repositories.EnderecoDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.MotoristaRepository;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemEscolaRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Busca de motoristas para o responsável, por nome e por proximidade.
@@ -39,6 +43,7 @@ public class BuscaMotoristaService {
 
     @Autowired private MotoristaRepository motoristaRepository;
     @Autowired private ViagemRepository viagemRepository;
+    @Autowired private ViagemEscolaRepository viagemEscolaRepository;
     @Autowired private ResponsavelRepository responsavelRepository;
     @Autowired private DependenteRepository dependenteRepository;
     @Autowired private EnderecoDependenteRepository enderecoDependenteRepository;
@@ -56,12 +61,35 @@ public class BuscaMotoristaService {
         Referencia referencia = referencia(responsavel, idDependente);
         String filtro = SolicitacaoService.normalizar(nome);
 
+        List<Long> escolaIds = escolasDeReferencia(responsavel, idDependente);
+        if (escolaIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> motoristasDasEscolas = Set.copyOf(
+                viagemEscolaRepository.listarIdsMotoristasAtivosDasEscolas(escolaIds, StatusVinculoEscola.ATIVO));
+
         return motoristaRepository.findAtivosComVeiculo().stream()
+                .filter(m -> motoristasDasEscolas.contains(m.getId()))
                 .filter(m -> filtro.isEmpty() || SolicitacaoService.normalizar(m.getNome()).contains(filtro))
                 .map(m -> toDTO(m, referencia))
                 .filter(dto -> !somenteProximos || MESMO_BAIRRO.equals(dto.proximidade()) || MESMA_CIDADE.equals(dto.proximidade()))
                 .sorted(Comparator.comparingInt((MotoristaDisponivelDTO dto) -> ordem(dto.proximidade()))
                         .thenComparing(MotoristaDisponivelDTO::nome, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
+
+    /** Escolas do dependente informado ou, sem ele, de todos os dependentes do responsável. */
+    private List<Long> escolasDeReferencia(Responsavel responsavel, Long idDependente) {
+        List<Dependente> dependentes = idDependente != null
+                ? dependenteRepository.findById(idDependente).map(List::of).orElse(List.of())
+                : (responsavel.getDependentes() != null ? responsavel.getDependentes() : List.<Dependente>of());
+        return dependentes.stream()
+                .filter(d -> idDependente == null || Objects.equals(d.getId(), idDependente))
+                .map(Dependente::getEscola)
+                .filter(Objects::nonNull)
+                .map(Escola::getId)
+                .filter(Objects::nonNull)
+                .distinct()
                 .toList();
     }
 
@@ -95,8 +123,18 @@ public class BuscaMotoristaService {
             return !b.isEmpty() && b.equals(referencia.bairro()) ? MESMO_BAIRRO : MESMA_CIDADE;
         }
         String texto = referencia.texto();
-        if (!texto.contains(c)) return OUTRA_CIDADE;
+        boolean mesmaCidade = texto.contains(c) || c.equals(referencia.cidadeEscola());
+        if (!mesmaCidade) return OUTRA_CIDADE;
         return !b.isEmpty() && texto.contains(b) ? MESMO_BAIRRO : MESMA_CIDADE;
+    }
+
+    /** Cidade da escola do dependente: o motorista só atende essa escola, então ela serve de referência quando o endereço texto não traz cidade. */
+    private String cidadeDaEscola(Dependente dependente) {
+        Escola escola = dependente.getEscola();
+        if (escola == null || escola.getUsuario() == null || escola.getUsuario().getEnderecoOperacional() == null) {
+            return null;
+        }
+        return SolicitacaoService.normalizar(escola.getUsuario().getEnderecoOperacional().getCidade());
     }
 
     private Referencia referencia(Responsavel responsavel, Long idDependente) {
@@ -114,12 +152,12 @@ public class BuscaMotoristaService {
                 return Referencia.estruturada(SolicitacaoService.normalizar(e.getBairro()), SolicitacaoService.normalizar(e.getCidade()));
             }
             if (dependente.getEndereco() != null && !dependente.getEndereco().isBlank()) {
-                return Referencia.texto(SolicitacaoService.normalizar(dependente.getEndereco()));
+                return Referencia.texto(SolicitacaoService.normalizar(dependente.getEndereco()), cidadeDaEscola(dependente));
             }
         }
         String enderecoResponsavel = responsavel.getUsuario() != null ? responsavel.getUsuario().getEndereco() : null;
         if (enderecoResponsavel == null || enderecoResponsavel.isBlank()) return null;
-        return Referencia.texto(SolicitacaoService.normalizar(enderecoResponsavel));
+        return Referencia.texto(SolicitacaoService.normalizar(enderecoResponsavel), null);
     }
 
     private static int ordem(String proximidade) {
@@ -131,13 +169,13 @@ public class BuscaMotoristaService {
         };
     }
 
-    record Referencia(boolean estruturada, String bairro, String cidade, String texto) {
+    record Referencia(boolean estruturada, String bairro, String cidade, String texto, String cidadeEscola) {
         static Referencia estruturada(String bairro, String cidade) {
-            return new Referencia(true, bairro, cidade, null);
+            return new Referencia(true, bairro, cidade, null, null);
         }
 
-        static Referencia texto(String texto) {
-            return new Referencia(false, null, null, texto);
+        static Referencia texto(String texto, String cidadeEscola) {
+            return new Referencia(false, null, null, texto, cidadeEscola);
         }
     }
 }
