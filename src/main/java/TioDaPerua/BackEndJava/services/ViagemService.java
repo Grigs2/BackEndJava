@@ -120,11 +120,16 @@ public class ViagemService {
     public ProntidaoViagemDTO consultarProntidao(Long idViagem) {
         Viagem viagem = viagemRepository.findById(idViagem)
                 .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
-        List<String> bloqueios = coletarBloqueiosProntidao(viagem);
-        return new ProntidaoViagemDTO(idViagem, bloqueios.isEmpty(), bloqueios);
+        List<String> avisos = new ArrayList<>();
+        List<String> bloqueios = coletarBloqueiosProntidao(viagem, avisos);
+        return new ProntidaoViagemDTO(idViagem, bloqueios.isEmpty(), bloqueios, avisos.stream().distinct().toList());
     }
 
-    private List<String> coletarBloqueiosProntidao(Viagem viagem) {
+    /**
+     * Pendências que impedem iniciar a viagem. Documentos do motorista não bloqueiam (ainda não há quem os valide)
+     * e entram em {@code avisos}. O vínculo ativo do motorista com a escola continua obrigatório.
+     */
+    private List<String> coletarBloqueiosProntidao(Viagem viagem, List<String> avisos) {
         List<String> bloqueios = new ArrayList<>();
         if (!Boolean.TRUE.equals(viagem.getAtivo())) {
             bloqueios.add("O itinerário está desativado");
@@ -146,7 +151,7 @@ public class ViagemService {
                 != StatusValidacaoEndereco.VALIDADO) {
             bloqueios.add("Endereço estruturado do motorista ausente ou sem CEP validado");
         }
-        bloqueios.addAll(documentoMotoristaService.listarPendenciasParaInicio(motorista.getId()));
+        avisos.addAll(documentoMotoristaService.listarPendenciasParaInicio(motorista.getId()));
 
         List<ViagemDependente> dependentes = viagemDependenteRepository.buscarDependentesCompletos(viagem.getId());
         if (dependentes.isEmpty()) {
@@ -191,7 +196,7 @@ public class ViagemService {
                                 + " ausente ou sem CEP validado");
                     }
                     if (!escolasComVinculoAtivo.contains(escola.getId())) {
-                        bloqueios.add("Não há vínculo operacional ativo com a escola " + escola.getId());
+                        bloqueios.add("Não há vínculo ativo com a escola " + (escola.getNome() != null ? escola.getNome() : escola.getId()));
                     }
                 }
 
@@ -1093,7 +1098,7 @@ public class ViagemService {
         }
 
         if (status == StatusViagemDia.EM_ANDAMENTO) {
-            List<String> bloqueios = coletarBloqueiosProntidao(viagemDia.getViagem());
+            List<String> bloqueios = coletarBloqueiosProntidao(viagemDia.getViagem(), new ArrayList<>());
             if (!bloqueios.isEmpty()) {
                 throw new BusinessException("Execução bloqueada: " + String.join("; ", bloqueios));
             }

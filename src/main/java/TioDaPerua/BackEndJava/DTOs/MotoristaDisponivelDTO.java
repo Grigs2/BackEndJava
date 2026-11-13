@@ -7,6 +7,8 @@ import java.util.List;
  * bairro/cidade de atuação e viagens ativas (sem CPF, telefone, e-mail ou endereço completo).
  *
  * @param proximidade MESMO_BAIRRO, MESMA_CIDADE, OUTRA_CIDADE ou SEM_REFERENCIA (quando não há endereço para comparar)
+ * @param viagensComAluno viagens em que o aluno pesquisado já está (o app não oferece "Pedir vaga" nelas)
+ * @param viagensComSolicitacaoPendente viagens com pedido ou convite em aberto para o aluno pesquisado
  */
 public record MotoristaDisponivelDTO(Long id,
                                      String nome,
@@ -17,5 +19,13 @@ public record MotoristaDisponivelDTO(Long id,
                                      String cidade,
                                      String uf,
                                      String proximidade,
-                                     List<ViagemDTO> viagens) {
+                                     List<ViagemDTO> viagens,
+                                     List<Long> viagensComAluno,
+                                     List<Long> viagensComSolicitacaoPendente) {
+
+    public MotoristaDisponivelDTO(Long id, String nome, String veiculoModelo, String veiculoCor, Integer veiculoCapacidade,
+                                  String bairro, String cidade, String uf, String proximidade, List<ViagemDTO> viagens) {
+        this(id, nome, veiculoModelo, veiculoCor, veiculoCapacidade, bairro, cidade, uf, proximidade, viagens,
+                List.of(), List.of());
+    }
 }

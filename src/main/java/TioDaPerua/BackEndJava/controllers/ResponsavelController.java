@@ -31,6 +31,19 @@ import jakarta.validation.Valid;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Responsavel")
 public class ResponsavelController {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private TioDaPerua.BackEndJava.services.ContraparteService contraparteService;
+
+    /** Dados do motorista de uma solicitação (pop-up antes de aceitar). CPF, e-mail e placa vêm mascarados. */
+    @GetMapping("/Solicitacoes/{idSolicitacao}/Contraparte")
+    @PreAuthorize("hasRole('RESPONSAVEL')")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.ContraparteDTO> contraparteDaSolicitacao(
+            @PathVariable Long idSolicitacao,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(contraparteService.motoristaDaSolicitacao(idSolicitacao, Long.valueOf(jwt.getSubject())));
+    }
+
+
     @Autowired
     private ResponsavelService responsavelService;
 

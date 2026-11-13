@@ -138,6 +138,23 @@ class SolicitacaoBidirecionalTest {
     }
 
     @Test
+    void aceitarEncerraOutraSolicitacaoAbertaDoMesmoAlunoNaMesmaViagem() {
+        Solicitacao aceita = solicitacaoAberta(OrigemSolicitacao.RESPONSAVEL);
+        Solicitacao duplicada = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
+        duplicada.setId(6L);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(aceita));
+        when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(solicitacaoRepository.findPendentesByDependenteId(7L)).thenReturn(List.of(aceita, duplicada));
+
+        service.responderComoMotorista(5L, true, USUARIO_MOTORISTA);
+
+        assertTrue(duplicada.isRespondido());
+        assertEquals(TioDaPerua.BackEndJava.enums.StatusSolicitacao.RECUSADA, duplicada.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(duplicada.getDataFim());
+        assertTrue(aceita.isAceito());
+    }
+
+    @Test
     void motoristaNaoRespondeOProprioConvite() {
         Solicitacao s = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
         when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));

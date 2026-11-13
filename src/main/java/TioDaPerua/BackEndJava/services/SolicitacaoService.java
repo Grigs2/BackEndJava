@@ -295,8 +295,30 @@ public class SolicitacaoService {
         solicitacao.setStatus(aceito ? StatusSolicitacao.ACEITA : StatusSolicitacao.RECUSADA);
         if (aceito) {
             abrirAcordo(solicitacao);
+            encerrarDuplicadas(solicitacao);
         }
         return solicitacaoRepository.save(solicitacao);
+    }
+
+    /**
+     * Com o aluno já na viagem, outras solicitações em aberto para o mesmo aluno e a mesma viagem (por exemplo um convite
+     * do motorista e um pedido do responsável feitos ao mesmo tempo) deixam de fazer sentido: são encerradas para não
+     * continuarem aparecendo como "Aceitar/Recusar".
+     */
+    private void encerrarDuplicadas(Solicitacao aceita) {
+        LocalDateTime agora = LocalDateTime.now();
+        Long viagemId = aceita.getViagem().getId();
+        for (Solicitacao outra : solicitacaoRepository.findPendentesByDependenteId(aceita.getDependente().getId())) {
+            if (Objects.equals(outra.getId(), aceita.getId()) || outra.getViagem() == null
+                    || !Objects.equals(outra.getViagem().getId(), viagemId)) {
+                continue;
+            }
+            outra.setRespondido(true);
+            outra.setAceito(false);
+            outra.setStatus(StatusSolicitacao.RECUSADA);
+            outra.setDataFim(agora);
+            solicitacaoRepository.save(outra);
+        }
     }
 
     /**

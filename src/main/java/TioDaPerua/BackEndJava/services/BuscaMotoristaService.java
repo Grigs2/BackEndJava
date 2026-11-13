@@ -47,6 +47,8 @@ public class BuscaMotoristaService {
     @Autowired private ResponsavelRepository responsavelRepository;
     @Autowired private DependenteRepository dependenteRepository;
     @Autowired private EnderecoDependenteRepository enderecoDependenteRepository;
+    @Autowired private TioDaPerua.BackEndJava.repositories.ViagemDependenteRepository viagemDependenteRepository;
+    @Autowired private TioDaPerua.BackEndJava.repositories.SolicitacaoRepository solicitacaoRepository;
 
     /**
      * @param nome            filtro opcional pelo nome do motorista (ignora maiúsculas e acentos)
@@ -68,10 +70,19 @@ public class BuscaMotoristaService {
         Set<Long> motoristasDasEscolas = Set.copyOf(
                 viagemEscolaRepository.listarIdsMotoristasAtivosDasEscolas(escolaIds, StatusVinculoEscola.ATIVO));
 
+        // Situação do aluno pesquisado em cada viagem, para o app não oferecer "Pedir vaga" onde ele já está.
+        List<Long> viagensComAluno = idDependente == null || viagemDependenteRepository == null ? List.of()
+                : viagemDependenteRepository.findAtivosByDependenteId(idDependente).stream()
+                        .map(vd -> vd.getViagem().getId()).distinct().toList();
+        List<Long> viagensPendentes = idDependente == null || solicitacaoRepository == null ? List.of()
+                : solicitacaoRepository.findPendentesByDependenteId(idDependente).stream()
+                        .filter(s -> s.getViagem() != null)
+                        .map(s -> s.getViagem().getId()).distinct().toList();
+
         return motoristaRepository.findAtivosComVeiculo().stream()
                 .filter(m -> motoristasDasEscolas.contains(m.getId()))
                 .filter(m -> filtro.isEmpty() || SolicitacaoService.normalizar(m.getNome()).contains(filtro))
-                .map(m -> toDTO(m, referencia))
+                .map(m -> toDTO(m, referencia, viagensComAluno, viagensPendentes))
                 .filter(dto -> !somenteProximos || MESMO_BAIRRO.equals(dto.proximidade()) || MESMA_CIDADE.equals(dto.proximidade()))
                 .sorted(Comparator.comparingInt((MotoristaDisponivelDTO dto) -> ordem(dto.proximidade()))
                         .thenComparing(MotoristaDisponivelDTO::nome, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
@@ -93,7 +104,8 @@ public class BuscaMotoristaService {
                 .toList();
     }
 
-    private MotoristaDisponivelDTO toDTO(Motorista motorista, Referencia referencia) {
+    private MotoristaDisponivelDTO toDTO(Motorista motorista, Referencia referencia,
+                                         List<Long> viagensComAluno, List<Long> viagensPendentes) {
         EnderecoOperacional endereco = motorista.getUsuario() != null ? motorista.getUsuario().getEnderecoOperacional() : null;
         String bairro = endereco != null ? endereco.getBairro() : null;
         String cidade = endereco != null ? endereco.getCidade() : null;
@@ -111,7 +123,9 @@ public class BuscaMotoristaService {
                 cidade,
                 endereco != null ? endereco.getUf() : null,
                 proximidade(bairro, cidade, referencia),
-                viagens);
+                viagens,
+                viagens.stream().map(ViagemDTO::id).filter(viagensComAluno::contains).toList(),
+                viagens.stream().map(ViagemDTO::id).filter(viagensPendentes::contains).toList());
     }
 
     static String proximidade(String bairro, String cidade, Referencia referencia) {

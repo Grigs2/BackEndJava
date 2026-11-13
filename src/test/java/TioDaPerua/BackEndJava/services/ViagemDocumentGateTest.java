@@ -41,6 +41,7 @@ import static org.mockito.Mockito.when;
 class ViagemDocumentGateTest {
 
     @Mock private ViagemDiaRepository viagemDiaRepository;
+    @Mock private TioDaPerua.BackEndJava.repositories.ViagemRepository viagemRepository;
     @Mock private ViagemDependenteRepository viagemDependenteRepository;
     @Mock private EnderecoDependenteRepository enderecoDependenteRepository;
     @Mock private ViagemEscolaRepository viagemEscolaRepository;
@@ -64,6 +65,48 @@ class ViagemDocumentGateTest {
         service.alterarStatusViagemDia(9L, "EM_ANDAMENTO", null, 100L);
 
         verify(documentoMotoristaService).listarPendenciasParaInicio(42L);
+    }
+
+    @Test
+    void iniciaMesmoComDocumentosPendentes() {
+        ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
+        prepararProntidao(execucao, true);
+        when(viagemDiaRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(execucao));
+        when(viagemDiaRepository.save(any(ViagemDia.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(documentoMotoristaService.listarPendenciasParaInicio(42L))
+                .thenReturn(List.of("Documento CNH pendente, recusado ou vencido"));
+        when(usuarioRepository.findById(100L)).thenReturn(Optional.of(execucao.getViagem().getMotorista().getUsuario()));
+
+        service.alterarStatusViagemDia(9L, "EM_ANDAMENTO", null, 100L);
+
+        org.junit.jupiter.api.Assertions.assertEquals(StatusViagemDia.EM_ANDAMENTO, execucao.getStatus());
+    }
+
+    @Test
+    void naoIniciaSemVinculoComAEscola() {
+        ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
+        prepararProntidao(execucao, false);
+        when(viagemDiaRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(execucao));
+        when(documentoMotoristaService.listarPendenciasParaInicio(42L)).thenReturn(List.of());
+
+        var e = org.junit.jupiter.api.Assertions.assertThrows(TioDaPerua.BackEndJava.exceptions.BusinessException.class,
+                () -> service.alterarStatusViagemDia(9L, "EM_ANDAMENTO", null, 100L));
+        org.junit.jupiter.api.Assertions.assertTrue(e.getMessage().contains("Não há vínculo ativo com a escola 12"));
+    }
+
+    @Test
+    void prontidaoMostraDocumentosComoAvisos() {
+        ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
+        prepararProntidao(execucao, true);
+        when(viagemRepository.findById(77L)).thenReturn(Optional.of(execucao.getViagem()));
+        when(documentoMotoristaService.listarPendenciasParaInicio(42L))
+                .thenReturn(List.of("Documento CNH pendente, recusado ou vencido"));
+
+        var prontidao = service.consultarProntidao(77L);
+
+        org.junit.jupiter.api.Assertions.assertTrue(prontidao.pronta());
+        org.junit.jupiter.api.Assertions.assertTrue(prontidao.bloqueios().isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals(List.of("Documento CNH pendente, recusado ou vencido"), prontidao.avisos());
     }
 
     @Test
@@ -103,6 +146,10 @@ class ViagemDocumentGateTest {
     }
 
     private void prepararProntidao(ViagemDia execucao) {
+        prepararProntidao(execucao, true);
+    }
+
+    private void prepararProntidao(ViagemDia execucao, boolean comVinculoEscola) {
         Escola escola = new Escola();
         escola.setId(12L);
         Usuario usuarioEscola = new Usuario();
@@ -123,6 +170,6 @@ class ViagemDocumentGateTest {
                 .thenReturn(List.of(enderecoDependente));
         when(viagemEscolaRepository.listarIdsEscolasAtivasDoMotorista(
                 42L, Set.of(12L), TioDaPerua.BackEndJava.enums.StatusVinculoEscola.ATIVO))
-                .thenReturn(List.of(12L));
+                .thenReturn(comVinculoEscola ? List.of(12L) : List.of());
     }
 }

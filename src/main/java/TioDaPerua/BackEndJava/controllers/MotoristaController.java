@@ -32,6 +32,10 @@ import java.util.List;
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Motorista")
 public class MotoristaController {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private TioDaPerua.BackEndJava.services.ContraparteService contraparteService;
+
+
     @Autowired
     private MotoristaService motoristaService;
 
@@ -54,6 +58,15 @@ public class MotoristaController {
         return ResponseEntity.ok(solicitacaoService.listarDoMotorista(idMotorista).stream()
                 .map(TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO::toDTO)
                 .toList());
+    }
+
+    /** Dados do responsável e do aluno de uma solicitação (pop-up antes de aceitar). CPF e e-mail vêm mascarados. */
+    @GetMapping("/Solicitacoes/{idSolicitacao}/Contraparte")
+    @PreAuthorize("hasRole('MOTORISTA')")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.ContraparteDTO> contraparteDaSolicitacao(
+            @PathVariable Long idSolicitacao,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(contraparteService.responsavelDaSolicitacao(idSolicitacao, Long.valueOf(jwt.getSubject())));
     }
 
     /** O motorista aceita ou recusa um pedido de vaga feito pelo responsável. */
