@@ -2,9 +2,12 @@ package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.entities.Notificacao;
 import TioDaPerua.BackEndJava.entities.Usuario;
+import TioDaPerua.BackEndJava.entities.ViagemDia;
 import TioDaPerua.BackEndJava.enums.TipoNotificacao;
 import TioDaPerua.BackEndJava.repositories.NotificacaoRepository;
+import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
+import TioDaPerua.BackEndJava.repositories.ViagemDiaRepository;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,12 @@ public class NotificacaoService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private ViagemDiaRepository viagemDiaRepository;
+
+    @Autowired
+    private ResponsavelRepository responsavelRepository;
+
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     /**
@@ -66,7 +75,16 @@ public class NotificacaoService {
         Usuario destinatario = usuarioRepository.findById(destinatarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Destinatário não encontrado com id: " + destinatarioId));
 
-        notificacao.setData(LocalDateTime.now());
+        if (notificacao.getDependenteId() != null && notificacao.getViagemDiaId() == null) {
+            throw new BusinessException("Mensagem sobre aluno exige a viagem do dia");
+        }
+        if (notificacao.getViagemDiaId() != null) {
+            validarMotoristaDaViagemDia(notificacao.getViagemDiaId(), remetenteId);
+        }
+        if (notificacao.getDependenteId() != null) {
+            validarResponsavelDoAluno(notificacao.getDependenteId(), destinatarioId);
+        }
+
         notificacao.setVisto(false);
         notificacao.setRemetente(remetente);
         notificacao.setDestinatario(destinatario);
@@ -76,6 +94,24 @@ public class NotificacaoService {
         Notificacao salva = notificacaoRepository.save(notificacao);
         publicar(List.of(salva));
         return salva;
+    }
+
+    private void validarMotoristaDaViagemDia(Long viagemDiaId, Long remetenteId) {
+        ViagemDia viagemDia = viagemDiaRepository.findById(viagemDiaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem do dia não encontrada com id: " + viagemDiaId));
+        Usuario motorista = viagemDia.getViagem() == null || viagemDia.getViagem().getMotorista() == null
+                ? null : viagemDia.getViagem().getMotorista().getUsuario();
+        if (motorista == null || !motorista.getId().equals(remetenteId)) {
+            throw new BusinessException("Somente o motorista da viagem pode enviar mensagem vinculada a ela");
+        }
+    }
+
+    private void validarResponsavelDoAluno(Long dependenteId, Long destinatarioId) {
+        boolean ehResponsavel = responsavelRepository.findUsuariosAtivosPorDependentes(List.of(dependenteId)).stream()
+                .anyMatch(vinculo -> destinatarioId.equals(vinculo.getUsuarioId()));
+        if (!ehResponsavel) {
+            throw new BusinessException("Destinatário não é responsável ativo do aluno");
+        }
     }
 
     public List<Notificacao> listarNaoVistasPorUsuario(Long usuarioId) {

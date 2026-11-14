@@ -8,8 +8,8 @@ import jakarta.validation.constraints.Positive;
 import java.time.LocalDateTime;
 
 /**
- * Notificação. Os campos tipo, prioridade, viagemDiaId, dependenteId e lidaEm são preenchidos pelo servidor
- * (avisos automáticos) e ignorados quando o DTO chega como corpo de um aviso manual.
+ * Notificação. Os campos tipo, prioridade e lidaEm são preenchidos pelo servidor. Em envio manual, viagemDiaId e
+ * dependenteId são validados pelo serviço (motorista da viagem e responsável ativo do aluno).
  */
 public record NotificacaoDTO(Long id,
                             @NotBlank String titulo,
@@ -52,6 +52,8 @@ public record NotificacaoDTO(Long id,
         n.setMensagem(dto.mensagem());
         n.setData(dto.dataCriacao());
         n.setVisto(dto.visto());
+        n.setViagemDiaId(dto.viagemDiaId());
+        n.setDependenteId(dto.dependenteId());
         return n;
     }
 }
