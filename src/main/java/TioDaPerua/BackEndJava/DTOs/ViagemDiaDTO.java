@@ -8,15 +8,20 @@ public record   ViagemDiaDTO(
     Long id,
     LocalDate data,
     String status,
-    LocalDateTime dataUltimaAlteracaoStatus
+    LocalDateTime dataUltimaAlteracaoStatus,
+    Long viagemId,
+    String periodo
 ) {
     public static ViagemDiaDTO toDTO(ViagemDia entity) {
         if (entity == null) return null;
+        var viagem = entity.getViagem();
         return new ViagemDiaDTO(
             entity.getId(),
             entity.getData(),
             entity.getStatus() != null ? entity.getStatus().name() : null,
-            entity.getDataUltimaAlteracaoStatus()
+            entity.getDataUltimaAlteracaoStatus(),
+            viagem != null ? viagem.getId() : null,
+            viagem != null && viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null
         );
     }
 }

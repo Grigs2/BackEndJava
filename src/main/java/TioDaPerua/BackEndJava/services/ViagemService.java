@@ -358,7 +358,8 @@ public class ViagemService {
 
                 agrupamento.computeIfAbsent(endereco, k -> new ArrayList<>())
                         .add(new DependenteParadaDTO(
-                                dep.getId(), dep.getNome(), resp == null ? "N/A" : resp.getNome(), statusEmbarque));
+                                dep.getId(), dep.getNome(), resp == null ? "N/A" : resp.getNome(), statusEmbarque,
+                                usuarioIdDo(resp)));
                 nomesLocais.putIfAbsent(endereco, enderecoNome(dep, presenca, ida, resp));
             }
         }
@@ -392,7 +393,8 @@ public class ViagemService {
                         ? presenca.getStatus().name() : "N/A";
 
                 agrupamento.computeIfAbsent(endereco, k -> new ArrayList<>())
-                        .add(new DependenteParadaDTO(dep.getId(), dep.getNome(), nomeResp, statusEmbarque));
+                        .add(new DependenteParadaDTO(dep.getId(), dep.getNome(), nomeResp, statusEmbarque,
+                                usuarioIdDo(responsavelPrincipal(dep))));
                 nomesLocais.putIfAbsent(endereco, "Escola: " + escola.getNome());
             }
         }
@@ -664,6 +666,20 @@ public class ViagemService {
     }
 
     private List<ParadaDTO> mapearParadas(List<ViagemParada> paradas) {
+        List<Long> dependenteIds = paradas.stream()
+                .flatMap(parada -> parada.getParticipantes().stream())
+                .map(participante -> participante.getDependenteIdSnapshot())
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Long> usuarioResponsavelPorDependente = dependenteIds.isEmpty()
+                ? Map.of()
+                : responsavelRepository.findUsuariosAtivosPorDependentes(dependenteIds).stream()
+                        .collect(Collectors.toMap(
+                                DependenteResponsavelUsuarioProjection::getDependenteId,
+                                DependenteResponsavelUsuarioProjection::getUsuarioId,
+                                (primeiro, segundo) -> primeiro));
+
         return paradas.stream()
                 .map(parada -> new ParadaDTO(
                         parada.getId(),
@@ -677,7 +693,8 @@ public class ViagemService {
                                         participante.getNomeDependenteSnapshot(),
                                         participante.getNomeResponsavelSnapshot(),
                                         participante.getPresenca().getStatus() == null
-                                                ? "N/A" : participante.getPresenca().getStatus().name()))
+                                                ? "N/A" : participante.getPresenca().getStatus().name(),
+                                        usuarioResponsavelPorDependente.get(participante.getDependenteIdSnapshot())))
                                 .toList()))
                 .toList();
     }
@@ -1257,6 +1274,10 @@ public class ViagemService {
         return presenca != null && (ida
                 ? presenca.getEnderecoEmbarqueSnapshot() != null
                 : presenca.getEnderecoDesembarqueSnapshot() != null);
+    }
+
+    private Long usuarioIdDo(Responsavel responsavel) {
+        return responsavel == null || responsavel.getUsuario() == null ? null : responsavel.getUsuario().getId();
     }
 
     private Responsavel responsavelPrincipal(Dependente dependente) {
