@@ -1,0 +1,271 @@
+{
+  "senhaPadrao": "Teste@TioDaPerua2026",
+  "dominioEmail": "teste.tiodaperua.com.br",
+  "escolas": [
+    {
+      "ref": "escola-sp",
+      "nome": "Escola Municipal Monteiro Lobato",
+      "cnpj": "10433218000193",
+      "telefone": "1133334444",
+      "endereco": {
+        "cep": "05405-150",
+        "logradouro": "Rua Teodoro Sampaio",
+        "numero": "1200",
+        "bairro": "Pinheiros",
+        "cidade": "São Paulo",
+        "uf": "SP"
+      }
+    },
+    {
+      "ref": "escola-rj",
+      "nome": "Escola Municipal Cecília Meireles",
+      "cnpj": "19600133000127",
+      "telefone": "2133335555",
+      "endereco": {
+        "cep": "22011-001",
+        "logradouro": "Rua Barata Ribeiro",
+        "numero": "181",
+        "bairro": "Copacabana",
+        "cidade": "Rio de Janeiro",
+        "uf": "RJ"
+      }
+    },
+    {
+      "ref": "escola-bh",
+      "nome": "Escola Municipal Professora Helena Antipoff",
+      "cnpj": "89083863000183",
+      "telefone": "3136667777",
+      "endereco": {
+        "cep": "30130-150",
+        "logradouro": "Rua Pernambuco",
+        "numero": "1000",
+        "bairro": "Funcionários",
+        "cidade": "Belo Horizonte",
+        "uf": "MG"
+      }
+    }
+  ],
+  "motoristas": [
+    {
+      "ref": "motorista-sp",
+      "nome": "Carlos Eduardo Lima",
+      "dataNascimento": "1985-03-12",
+      "cpf": "79402654232",
+      "cnh": "04512387612",
+      "email": "motorista.sp@teste.tiodaperua.com.br",
+      "telefone": "11987654321",
+      "escolaRef": "escola-sp",
+      "enderecoOperacional": {
+        "cep": "05416-001",
+        "logradouro": "Rua Fradique Coutinho",
+        "numero": "500",
+        "bairro": "Pinheiros",
+        "cidade": "São Paulo",
+        "uf": "SP"
+      },
+      "veiculo": {
+        "modelo": "Fiat Ducato",
+        "placa": "RTA2B34",
+        "ano": 2019,
+        "capacidade": 15,
+        "cor": "Branco"
+      }
+    },
+    {
+      "ref": "motorista-rj",
+      "nome": "Paulo Roberto Gomes",
+      "dataNascimento": "1978-05-30",
+      "cpf": "35116155935",
+      "cnh": "02345678901",
+      "email": "motorista.rj@teste.tiodaperua.com.br",
+      "telefone": "21976543210",
+      "escolaRef": "escola-rj",
+      "enderecoOperacional": {
+        "cep": "22051-011",
+        "logradouro": "Rua Constante Ramos",
+        "numero": "100",
+        "bairro": "Copacabana",
+        "cidade": "Rio de Janeiro",
+        "uf": "RJ"
+      },
+      "veiculo": {
+        "modelo": "Mercedes-Benz Sprinter",
+        "placa": "BRA2E19",
+        "ano": 2020,
+        "capacidade": 16,
+        "cor": "Prata"
+      }
+    },
+    {
+      "ref": "motorista-bh",
+      "nome": "Anderson Rocha Mendes",
+      "dataNascimento": "1990-10-25",
+      "cpf": "40781618479",
+      "cnh": "05678901234",
+      "email": "motorista.bh@teste.tiodaperua.com.br",
+      "telefone": "31965432109",
+      "escolaRef": "escola-bh",
+      "enderecoOperacional": {
+        "cep": "30160-031",
+        "logradouro": "Rua Espírito Santo",
+        "numero": "500",
+        "bairro": "Centro",
+        "cidade": "Belo Horizonte",
+        "uf": "MG"
+      },
+      "veiculo": {
+        "modelo": "Renault Master",
+        "placa": "FGH3I45",
+        "ano": 2018,
+        "capacidade": 14,
+        "cor": "Branco"
+      }
+    }
+  ],
+  "responsaveis": [
+    {
+      "ref": "responsavel-sp-1",
+      "nome": "Fernanda Souza Ribeiro",
+      "cpf": "95931034145",
+      "dataNascimento": "1982-07-20",
+      "email": "responsavel.sp1@teste.tiodaperua.com.br",
+      "telefone": "11991234567",
+      "endereco": {
+        "cep": "05408-003",
+        "logradouro": "Rua Cardeal Arcoverde",
+        "numero": "300",
+        "bairro": "Pinheiros",
+        "cidade": "São Paulo",
+        "uf": "SP"
+      },
+      "dependentes": [
+        {
+          "nome": "Lucas Ribeiro Souza",
+          "dataNascimento": "2015-03-14",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-sp"
+        },
+        {
+          "nome": "Sofia Ribeiro Souza",
+          "dataNascimento": "2017-08-30",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-sp"
+        }
+      ]
+    },
+    {
+      "ref": "responsavel-sp-2",
+      "nome": "Rodrigo Almeida Nunes",
+      "cpf": "31647525551",
+      "dataNascimento": "1979-11-02",
+      "email": "responsavel.sp2@teste.tiodaperua.com.br",
+      "telefone": "11982223344",
+      "endereco": {
+        "cep": "05435-000",
+        "logradouro": "Rua Harmonia",
+        "numero": "200",
+        "bairro": "Sumarezinho",
+        "cidade": "São Paulo",
+        "uf": "SP"
+      },
+      "dependentes": [
+        {
+          "nome": "Ana Clara Almeida Nunes",
+          "dataNascimento": "2013-10-07",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-sp"
+        }
+      ]
+    },
+    {
+      "ref": "responsavel-rj-1",
+      "nome": "Juliana Martins Pereira",
+      "cpf": "34192832704",
+      "dataNascimento": "1984-01-15",
+      "email": "responsavel.rj1@teste.tiodaperua.com.br",
+      "telefone": "21998765432",
+      "endereco": {
+        "cep": "22031-071",
+        "logradouro": "Rua Siqueira Campos",
+        "numero": "85",
+        "bairro": "Copacabana",
+        "cidade": "Rio de Janeiro",
+        "uf": "RJ"
+      },
+      "dependentes": [
+        {
+          "nome": "Gabriel Pereira Martins",
+          "dataNascimento": "2014-09-10",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-rj"
+        },
+        {
+          "nome": "Laura Pereira Martins",
+          "dataNascimento": "2016-04-22",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-rj"
+        },
+        {
+          "nome": "Mateus Pereira Martins",
+          "dataNascimento": "2011-12-05",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-rj"
+        }
+      ]
+    },
+    {
+      "ref": "responsavel-rj-2",
+      "nome": "Marcelo Teixeira Batista",
+      "cpf": "64835030591",
+      "dataNascimento": "1976-08-09",
+      "email": "responsavel.rj2@teste.tiodaperua.com.br",
+      "telefone": "21987651234",
+      "endereco": {
+        "cep": "22270-000",
+        "logradouro": "Rua Voluntários da Pátria",
+        "numero": "400",
+        "bairro": "Botafogo",
+        "cidade": "Rio de Janeiro",
+        "uf": "RJ"
+      },
+      "dependentes": [
+        {
+          "nome": "Sofia Teixeira Batista",
+          "dataNascimento": "2012-02-14",
+          "periodo": "TARDE_IDA",
+          "escolaRef": "escola-rj"
+        },
+        {
+          "nome": "Davi Teixeira Batista",
+          "dataNascimento": "2015-12-03",
+          "periodo": "TARDE_IDA",
+          "escolaRef": "escola-rj"
+        }
+      ]
+    },
+    {
+      "ref": "responsavel-bh-1",
+      "nome": "Patrícia Lopes Vieira",
+      "cpf": "64139537647",
+      "dataNascimento": "1988-04-18",
+      "email": "responsavel.bh1@teste.tiodaperua.com.br",
+      "telefone": "31991237788",
+      "endereco": {
+        "cep": "30140-130",
+        "logradouro": "Rua Tomé de Souza",
+        "numero": "150",
+        "bairro": "Savassi",
+        "cidade": "Belo Horizonte",
+        "uf": "MG"
+      },
+      "dependentes": [
+        {
+          "nome": "Miguel Lopes Vieira",
+          "dataNascimento": "2013-06-05",
+          "periodo": "MANHA_IDA",
+          "escolaRef": "escola-bh"
+        }
+      ]
+    }
+  ]
+}

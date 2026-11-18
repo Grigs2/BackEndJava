@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Credenciais de teste geradas pelo seed ###
+scripts/seed-perfis-teste/credenciais.txt
