@@ -46,6 +46,9 @@ public class ViagemController {
     private SincronizacaoOfflineService sincronizacaoOfflineService;
 
     @Autowired
+    private TioDaPerua.BackEndJava.services.RotaViagemService rotaViagemService;
+
+    @Autowired
     private TioDaPerua.BackEndJava.services.HistoricoService historicoService;
 
     @PostMapping("/CriarViagem/{id_motorista}")
@@ -330,6 +333,15 @@ public class ViagemController {
                 idDependente, Long.valueOf(jwt.getSubject()), dto.aceito()));
     }
 
+    @GetMapping("/Localizacao/Consentimento/Dependente/{idDependente}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<ConsentimentoLocalizacaoDTO> consultarConsentimentoLocalizacaoDependente(
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(localizacaoViagemService.consultarConsentimentoResponsavel(
+                idDependente, Long.valueOf(jwt.getSubject())));
+    }
+
     @GetMapping("/Localizacao/Consentimento/Execucao/{idViagemDia}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaExecucao(authentication, #p0)")
     public ResponseEntity<EstadoConsentimentoLocalizacaoDTO> estadoConsentimentoLocalizacao(
@@ -346,6 +358,21 @@ public class ViagemController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(localizacaoViagemService.registrarPosicao(
                 dto, Long.valueOf(jwt.getSubject())));
+    }
+
+    /**
+     * Rota e previsão de chegada da viagem em andamento. O motorista recebe a rota inteira (e pode mandar a
+     * posição do aparelho); o responsável recebe só o trecho até a parada do próprio aluno.
+     */
+    @GetMapping("/ViagemDia/{idViagemDia}/Rota")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.podeAcessarExecucao(authentication, #p0)")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.RotaViagemDTO> consultarRota(
+            @PathVariable Long idViagemDia,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(rotaViagemService.calcular(
+                idViagemDia, Long.valueOf(jwt.getSubject()), latitude, longitude));
     }
 
     @GetMapping("/Localizacao/Atual/{idViagemDia}")

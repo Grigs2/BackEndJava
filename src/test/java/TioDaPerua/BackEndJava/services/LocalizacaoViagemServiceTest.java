@@ -40,7 +40,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -78,12 +80,12 @@ class LocalizacaoViagemServiceTest {
         execucao.setViagem(viagem);
         execucao.setStatus(StatusViagemDia.EM_ANDAMENTO);
 
-        when(viagemDiaRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(execucao));
-        when(viagemDiaRepository.findById(90L)).thenReturn(Optional.of(execucao));
-        when(viagemPresencaRepository.findByViagemDiaId(90L)).thenReturn(List.of(presenca(5L)));
-        when(responsavelRepository.findUsuariosAtivosPorDependentes(List.of(5L)))
+        lenient().when(viagemDiaRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(execucao));
+        lenient().when(viagemDiaRepository.findById(90L)).thenReturn(Optional.of(execucao));
+        lenient().when(viagemPresencaRepository.findByViagemDiaId(90L)).thenReturn(List.of(presenca(5L)));
+        lenient().when(responsavelRepository.findUsuariosAtivosPorDependentes(List.of(5L)))
                 .thenReturn(List.of(vinculo(5L, 200L)));
-        when(consentimentoRepository.findLatestByDependentesAndUsuarios(
+        lenient().when(consentimentoRepository.findLatestByDependentesAndUsuarios(
                 TipoEscopoConsentimentoLocalizacao.DEPENDENTE, List.of(5L), java.util.Set.of(200L), "gps-v1"))
                 .thenReturn(List.of(consentimento(200L, 5L, AcaoConsentimentoLocalizacao.ACEITO)));
         when(consentimentoRepository
@@ -127,16 +129,62 @@ class LocalizacaoViagemServiceTest {
     }
 
     @Test
-    void blocksGpsWhenNoActiveResponsibleHasConsentedForEveryParticipant() {
-        when(consentimentoRepository.findLatestByDependentesAndUsuarios(
+    void motoristaEnviaPosicaoMesmoSemConsentimentoDosResponsaveis() {
+        lenient().when(consentimentoRepository.findLatestByDependentesAndUsuarios(
                 TipoEscopoConsentimentoLocalizacao.DEPENDENTE, List.of(5L), java.util.Set.of(200L), "gps-v1"))
                 .thenReturn(List.of());
+        when(localizacaoAtualRepository.findByViagemDia_Id(90L)).thenReturn(Optional.empty());
+        when(localizacaoAtualRepository.save(any(LocalizacaoViagemAtual.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         AtualizarLocalizacaoViagemDTO dto = new AtualizarLocalizacaoViagemDTO(
                 90L, new BigDecimal("-23.55"), new BigDecimal("-46.63"), Instant.now());
 
-        assertThrows(ConflictException.class, () -> service.registrarPosicao(dto, 100L));
+        service.registrarPosicao(dto, 100L);
 
+        verify(localizacaoAtualRepository).save(any(LocalizacaoViagemAtual.class));
+    }
+
+    @Test
+    void semConsentimentoDoMotoristaNaoEnviaPosicao() {
+        when(consentimentoRepository
+                .findTopByUsuario_IdAndEscopoAndDependenteIsNullAndVersaoPoliticaOrderByIdDesc(
+                        100L, TipoEscopoConsentimentoLocalizacao.MOTORISTA, "gps-v1"))
+                .thenReturn(Optional.empty());
+        AtualizarLocalizacaoViagemDTO dto = new AtualizarLocalizacaoViagemDTO(
+                90L, new BigDecimal("-23.55"), new BigDecimal("-46.63"), Instant.now());
+
+        ConflictException e = assertThrows(ConflictException.class, () -> service.registrarPosicao(dto, 100L));
+
+        assertTrue(e.getMessage().contains("motorista"));
         verify(localizacaoAtualRepository, never()).save(any(LocalizacaoViagemAtual.class));
+    }
+
+    @Test
+    void responsavelQueAutorizouVeAPosicao() {
+        when(viagemDiaRepository.existeVinculoResponsavel(90L, 200L)).thenReturn(true);
+        LocalizacaoViagemAtual atual = new LocalizacaoViagemAtual();
+        atual.setViagemDia(execucao);
+        atual.setLatitude(new BigDecimal("-23.55"));
+        atual.setLongitude(new BigDecimal("-46.63"));
+        atual.setRecebidoEm(Instant.now());
+        atual.setInstanteDispositivo(Instant.now());
+        when(localizacaoAtualRepository.findByViagemDia_Id(90L)).thenReturn(Optional.of(atual));
+
+        var result = service.consultarPosicaoAtual(90L, 200L);
+
+        assertEquals(new BigDecimal("-23.55"), result.latitude());
+    }
+
+    @Test
+    void responsavelSemAutorizacaoRecebePedidoParaAutorizar() {
+        when(viagemDiaRepository.existeVinculoResponsavel(90L, 200L)).thenReturn(true);
+        when(consentimentoRepository.findLatestByDependentesAndUsuarios(
+                TipoEscopoConsentimentoLocalizacao.DEPENDENTE, List.of(5L), java.util.Set.of(200L), "gps-v1"))
+                .thenReturn(List.of());
+
+        ConflictException e = assertThrows(ConflictException.class, () -> service.consultarPosicaoAtual(90L, 200L));
+
+        assertTrue(e.getMessage().startsWith("Autorize"));
     }
 
     private ViagemPresenca presenca(Long dependenteId) {
