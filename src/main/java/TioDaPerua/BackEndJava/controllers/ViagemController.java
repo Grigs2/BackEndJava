@@ -24,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
 import java.util.Map;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Instant;
 import org.springframework.data.domain.Page;
 
@@ -81,10 +82,14 @@ public class ViagemController {
         return ResponseEntity.ok(viagens);
     }
 
+    /** Sem datas: hoje (Brasília) até +6 dias, 7 dias no total. Os limites de de/ate são inclusivos. */
     @GetMapping("/Agenda/{idMotorista}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
-    public ResponseEntity<List<AgendaViagemDTO>> agenda(@PathVariable Long idMotorista) {
-        return ResponseEntity.ok(viagemService.agendaMotorista(idMotorista));
+    public ResponseEntity<List<AgendaViagemDTO>> agenda(
+            @PathVariable Long idMotorista,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate de,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ate) {
+        return ResponseEntity.ok(viagemService.agendaMotorista(idMotorista, de, ate));
     }
 
     @GetMapping("/Prontidao/{idViagem}")
@@ -114,7 +119,7 @@ public class ViagemController {
             return ResponseEntity.badRequest().build();
         }
         // Sem datas: último ano (antes devolvia tudo). Mais recentes primeiro.
-        java.time.LocalDate fim = ate == null ? java.time.LocalDate.now() : ate;
+        java.time.LocalDate fim = ate == null ? DataBrasilia.hoje() : ate;
         java.time.LocalDate inicio = de == null ? fim.minusDays(365) : de;
         return ResponseEntity.ok(historicoService.doMotorista(idMotorista, inicio, fim));
     }

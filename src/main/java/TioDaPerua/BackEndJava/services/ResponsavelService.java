@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -119,7 +120,7 @@ public class ResponsavelService {
     @Transactional
     public Responsavel cadastrarDependente(Long idResponsavel, Dependente dependente, Long idEscola) {
         if (idResponsavel == null || dependente == null) throw new IllegalArgumentException("IDs de responsável e dependente são obrigatórios");
-        if (dependente.getDataNascimento() != null && dependente.getDataNascimento().isAfter(java.time.LocalDate.now())) {
+        if (dependente.getDataNascimento() != null && dependente.getDataNascimento().isAfter(DataBrasilia.hoje())) {
             throw new BusinessException("A data de nascimento do dependente não pode estar no futuro");
         }
         if (dependente.getCpf() != null && !dependente.getCpf().isBlank()) {
@@ -197,7 +198,7 @@ public class ResponsavelService {
         }
 
         // Atualizar Solicitação
-        solicitacao.setDataFim(LocalDateTime.now());
+        solicitacao.setDataFim(DataBrasilia.agora());
         solicitacaoRepository.save(solicitacao);
 
         // Localizar ViagemDependente correspondente
@@ -274,7 +275,7 @@ public class ResponsavelService {
     }
 
     private void validarDataNascimento(java.time.LocalDate dataNascimento) {
-        if (dataNascimento != null && dataNascimento.isAfter(java.time.LocalDate.now())) {
+        if (dataNascimento != null && dataNascimento.isAfter(DataBrasilia.hoje())) {
             throw new BusinessException("A data de nascimento do responsável não pode estar no futuro");
         }
     }

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -49,7 +50,7 @@ public class AvaliacaoService {
 
         Avaliacao avaliacao = avaliacaoRepository.findByResponsavelIdAndMotoristaId(responsavel.getId(), motoristaId)
                 .orElseGet(Avaliacao::new);
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         if (avaliacao.getId() == null) {
             avaliacao.setResponsavel(responsavel);
             avaliacao.setMotorista(motorista);

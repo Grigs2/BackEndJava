@@ -14,8 +14,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,8 +40,11 @@ class ViagemAgendaTest {
     @InjectMocks private ViagemService service;
 
     @Test
-    void showsSevenCalendarDatesWithoutMaterializingFutureExecutions() {
-        LocalDate hoje = LocalDate.now();
+    void showsSevenBrasiliaDatesWithoutMaterializingFutureExecutions() {
+        // 18/11 23:40 em Brasília = 19/11 02:40 UTC: o dia de Brasília deve ser 18/11.
+        ReflectionTestUtils.setField(service, "relogio",
+                Clock.fixed(Instant.parse("2026-11-19T02:40:00Z"), ZoneId.of("America/Sao_Paulo")));
+        LocalDate hoje = LocalDate.of(2026, 11, 18);
         Viagem viagem = new Viagem();
         viagem.setId(8L);
         viagem.setPeriodo(Periodo.MANHA_IDA);
@@ -49,7 +57,7 @@ class ViagemAgendaTest {
         when(viagemDiaRepository.findByMotoristaIdAndDataBetween(4L, hoje, hoje.plusDays(6)))
                 .thenReturn(List.of(existente));
 
-        var agenda = service.agendaMotorista(4L);
+        var agenda = service.agendaMotorista(4L, null, null);
 
         assertEquals(7, agenda.size());
         assertEquals(hoje, agenda.get(0).data());
@@ -60,6 +68,26 @@ class ViagemAgendaTest {
         assertNull(agenda.get(0).idViagemDia());
         verify(viagemDiaRepository).findByMotoristaIdAndDataBetween(4L, hoje, hoje.plusDays(6));
         verify(viagemDiaRepository, never()).save(any());
+    }
+
+    @Test
+    void explicitRangeIsInclusiveAtBothEnds() {
+        LocalDate de = LocalDate.of(2026, 11, 18);
+        LocalDate ate = LocalDate.of(2026, 11, 19);
+        when(viagemRepository.findAtivasByMotoristaId(4L)).thenReturn(List.of());
+        when(viagemDiaRepository.findByMotoristaIdAndDataBetween(4L, de, ate)).thenReturn(List.of());
+
+        var agenda = service.agendaMotorista(4L, de, ate);
+
+        assertEquals(List.of(), agenda);
+        verify(viagemDiaRepository).findByMotoristaIdAndDataBetween(4L, de, ate);
+    }
+
+    @Test
+    void rejectsRangeEndingBeforeStart() {
+        assertThrows(BusinessException.class,
+                () -> service.agendaMotorista(4L, LocalDate.of(2026, 11, 19), LocalDate.of(2026, 11, 18)));
+        verify(viagemDiaRepository, never()).findByMotoristaIdAndDataBetween(any(), any(), any());
     }
 
     @Test

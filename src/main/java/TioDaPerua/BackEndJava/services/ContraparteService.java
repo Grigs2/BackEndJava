@@ -18,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
@@ -116,7 +117,7 @@ public class ContraparteService {
 
     private ContraparteDTO.AlunoResumo aluno(Dependente d) {
         if (d == null) return null;
-        Integer idade = d.getDataNascimento() == null ? null : Period.between(d.getDataNascimento(), LocalDate.now()).getYears();
+        Integer idade = d.getDataNascimento() == null ? null : Period.between(d.getDataNascimento(), DataBrasilia.hoje()).getYears();
         List<EnderecoDependente> enderecos = d.getId() == null ? List.of()
                 : enderecoDependenteRepository.findByDependenteIdAndAtivoTrueOrderById(d.getId());
         EnderecoDependente e = enderecos.isEmpty() ? null : enderecos.get(0);

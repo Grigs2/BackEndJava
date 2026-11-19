@@ -18,6 +18,15 @@ public interface ViagemDiaRepository extends JpaRepository<ViagemDia, Long> {
     @Query("SELECT vd FROM ViagemDia vd WHERE vd.viagem.id = :viagemId AND vd.data = :data")
     Optional<ViagemDia> findByViagemIdAndData(Long viagemId, LocalDate data);
 
+    @Query("""
+        SELECT vd FROM ViagemDia vd
+        WHERE vd.viagem.id = :viagemId
+        AND vd.status = :status
+        AND vd.data >= :data
+        ORDER BY vd.data ASC
+    """)
+    List<ViagemDia> findByViagemIdAndStatusAndDataGreaterThanEqual(Long viagemId, StatusViagemDia status, LocalDate data);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT vd FROM ViagemDia vd WHERE vd.id = :id")
     Optional<ViagemDia> findByIdForUpdate(Long id);

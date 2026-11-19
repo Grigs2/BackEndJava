@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -176,7 +177,7 @@ public class MotoristaService {
     }
 
     private void validarIdadeMinima(LocalDate dataNascimento) {
-        if (dataNascimento == null || dataNascimento.isAfter(LocalDate.now().minusYears(18))) {
+        if (dataNascimento == null || dataNascimento.isAfter(DataBrasilia.hoje().minusYears(18))) {
             throw new BusinessException("O motorista deve ter pelo menos 18 anos completos");
         }
     }
@@ -205,7 +206,7 @@ public class MotoristaService {
         }
         if (veiculo.getModelo() == null || veiculo.getModelo().isBlank()
                 || veiculo.getCapacidade() <= 0 || veiculo.getAno() < 1900
-                || veiculo.getAno() > LocalDate.now().getYear() + 1) {
+                || veiculo.getAno() > DataBrasilia.hoje().getYear() + 1) {
             throw new BusinessException("Modelo, capacidade ou ano do veículo são inválidos");
         }
     }

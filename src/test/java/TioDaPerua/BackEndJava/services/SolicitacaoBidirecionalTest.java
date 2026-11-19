@@ -47,6 +47,7 @@ class SolicitacaoBidirecionalTest {
     @Mock private NotificacaoService notificacaoService;
     @Mock private ResponsavelRepository responsavelRepository;
     @Mock private ViagemEscolaRepository viagemEscolaRepository;
+    @Mock private ViagemService viagemService;
     @InjectMocks private SolicitacaoService service;
 
     private static final long USUARIO_RESPONSAVEL = 10L;
