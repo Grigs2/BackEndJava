@@ -140,14 +140,24 @@ public class LocalizacaoViagemService {
                         usuarioId, TipoEscopoConsentimentoLocalizacao.DEPENDENTE, dependenteId, versao);
         ConsentimentoLocalizacao consentimento = registrarTransicaoConsentimento(
                 usuario, TipoEscopoConsentimentoLocalizacao.DEPENDENTE, dependente, aceito, versao, atual);
-
-        if (!aceito && atual.map(this::estaAceito).orElse(false)) {
-            suspenderExecucoesAtivas(
-                    viagemDiaRepository.findIdsByDependenteIdAndStatus(
-                            dependenteId, StatusViagemDia.EM_ANDAMENTO),
-                    usuario);
-        }
+        // Revogar só tira o acesso deste responsável ao mapa; o envio do motorista continua para os demais.
         return ConsentimentoLocalizacaoDTO.from(consentimento);
+    }
+
+    /** Consentimento atual do responsável logado para um aluno (o app usa para mostrar "Permitir"). */
+    @Transactional(readOnly = true)
+    public ConsentimentoLocalizacaoDTO consultarConsentimentoResponsavel(Long dependenteId, Long usuarioId) {
+        exigirIdentidade(usuarioId);
+        Responsavel responsavel = responsavelRepository.findByUsuarioId(usuarioId)
+                .orElseThrow(() -> new AccessDeniedException("Somente responsável pode consultar este consentimento"));
+        dependenteRepository.findByIdAndResponsavelId(dependenteId, responsavel.getId())
+                .orElseThrow(() -> new AccessDeniedException("Responsável não possui vínculo ativo com o dependente"));
+        String versao = versaoPoliticaAtual();
+        return consentimentoRepository
+                .findTopByUsuario_IdAndEscopoAndDependente_IdAndVersaoPoliticaOrderByIdDesc(
+                        usuarioId, TipoEscopoConsentimentoLocalizacao.DEPENDENTE, dependenteId, versao)
+                .map(ConsentimentoLocalizacaoDTO::from)
+                .orElse(new ConsentimentoLocalizacaoDTO(false, versao, null));
     }
 
     @Transactional(readOnly = true)
@@ -159,7 +169,7 @@ public class LocalizacaoViagemService {
         List<Long> pendentes = dependentesSemConsentimento(viagemDiaId, versao);
         boolean suspenso = suspensaoRepository.existsByViagemDia_Id(viagemDiaId);
         boolean podeAtualizar = execucao.getStatus() == StatusViagemDia.EM_ANDAMENTO
-                && motoristaConsentiu && pendentes.isEmpty() && !suspenso;
+                && motoristaConsentiu && !suspenso;
         return new EstadoConsentimentoLocalizacaoDTO(
                 viagemDiaId, versao, motoristaConsentiu, pendentes, suspenso, podeAtualizar);
     }
@@ -218,10 +228,22 @@ public class LocalizacaoViagemService {
         return LocalizacaoViagemDTO.fromCurrent(salva, agora);
     }
 
+    /**
+     * Mesmas regras de quem pode ver a posição do veículo (motorista dono, ou responsável que autorizou).
+     * Usado também pela rota, que começa na posição do veículo.
+     */
+    @Transactional(readOnly = true)
+    public void validarLeituraLocalizacao(Long viagemDiaId, Long usuarioId) {
+        ViagemDia execucao = validarAcessoLeitura(viagemDiaId, usuarioId);
+        exigirGpsAtivo(viagemDiaId, usuarioDono(execucao));
+        exigirConsentimentoDoLeitor(execucao, usuarioId);
+    }
+
     @Transactional(readOnly = true)
     public LocalizacaoViagemDTO consultarPosicaoAtual(Long viagemDiaId, Long usuarioId) {
         ViagemDia execucao = validarAcessoLeitura(viagemDiaId, usuarioId);
         exigirGpsAtivo(viagemDiaId, usuarioDono(execucao));
+        exigirConsentimentoDoLeitor(execucao, usuarioId);
         LocalizacaoViagemAtual localizacao = localizacaoAtualRepository.findByViagemDia_Id(viagemDiaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Posição atual indisponível"));
         return LocalizacaoViagemDTO.fromCurrent(localizacao, Instant.now());
@@ -232,6 +254,7 @@ public class LocalizacaoViagemService {
             Long viagemDiaId, Long usuarioId, Instant inicio, Instant fim, int pagina, int tamanho) {
         ViagemDia execucao = validarAcessoLeitura(viagemDiaId, usuarioId);
         exigirGpsAtivo(viagemDiaId, usuarioDono(execucao));
+        exigirConsentimentoDoLeitor(execucao, usuarioId);
         Instant agora = Instant.now();
         if (inicio == null || fim == null || inicio.isAfter(fim) || fim.isAfter(agora)
                 || inicio.isBefore(agora.minus(RETENCAO_HISTORICO_GPS))) {
@@ -284,16 +307,43 @@ public class LocalizacaoViagemService {
         return consentimentoRepository.save(evento);
     }
 
+    /** Envio e leitura exigem o consentimento do motorista e que o GPS não tenha sido suspenso. */
     private void exigirGpsAtivo(Long viagemDiaId, Long motoristaUsuarioId) {
         String versao = versaoPoliticaAtual();
-        EstadoConsentimentoLocalizacaoDTO estado =
-                calcularEstadoConsentimento(viagemDiaId, motoristaUsuarioId, versao);
-        if (estado.gpsSuspenso()) {
+        if (suspensaoRepository.existsByViagemDia_Id(viagemDiaId)) {
             throw new ConflictException("GPS suspenso para esta execução após revogação de consentimento");
         }
-        if (!estado.motoristaConsentiu() || !estado.dependentesPendentes().isEmpty()) {
-            throw new ConflictException("GPS indisponível: consentimento do motorista e de um responsável ativo "
-                    + "por dependente participante são necessários");
+        if (!consentimentoMotoristaAtivo(motoristaUsuarioId, versao)) {
+            throw new ConflictException("GPS indisponível: o motorista ainda não autorizou o compartilhamento da localização");
+        }
+    }
+
+    /**
+     * O responsável só vê o mapa depois de autorizar para ao menos um dos seus alunos nesta viagem.
+     * A mensagem começa com "Autorize" para o app oferecer o botão de permitir.
+     */
+    private void exigirConsentimentoDoLeitor(ViagemDia execucao, Long usuarioId) {
+        if (usuarioId.equals(usuarioDono(execucao))) {
+            return;
+        }
+        String versao = versaoPoliticaAtual();
+        List<Long> dependenteIds = viagemPresencaRepository.findByViagemDiaId(execucao.getId()).stream()
+                .map(presenca -> presenca.getDependente().getId())
+                .distinct()
+                .toList();
+        List<Long> meusDependentes = dependenteIds.isEmpty() ? List.of()
+                : responsavelRepository.findUsuariosAtivosPorDependentes(dependenteIds).stream()
+                        .filter(vinculo -> usuarioId.equals(vinculo.getUsuarioId()))
+                        .map(DependenteResponsavelUsuarioProjection::getDependenteId)
+                        .distinct()
+                        .toList();
+        boolean autorizou = !meusDependentes.isEmpty() && consentimentoRepository
+                .findLatestByDependentesAndUsuarios(
+                        TipoEscopoConsentimentoLocalizacao.DEPENDENTE, meusDependentes, Set.of(usuarioId), versao)
+                .stream()
+                .anyMatch(this::estaAceito);
+        if (!autorizou) {
+            throw new ConflictException("Autorize o compartilhamento da localização para acompanhar o veículo no mapa");
         }
     }
 
@@ -310,7 +360,7 @@ public class LocalizacaoViagemService {
                 pendentes,
                 suspenso,
                 execucao.getStatus() == StatusViagemDia.EM_ANDAMENTO
-                        && motoristaConsentiu && pendentes.isEmpty() && !suspenso);
+                        && motoristaConsentiu && !suspenso);
     }
 
     private boolean consentimentoMotoristaAtivo(Long usuarioId, String versao) {
