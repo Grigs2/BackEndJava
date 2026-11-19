@@ -3,6 +3,7 @@ package TioDaPerua.BackEndJava.DTOs;
 import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.entities.Responsavel;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.Locale;
@@ -50,6 +51,6 @@ public record DependenteAnonimoDTO(
     }
 
     static Integer idade(LocalDate nascimento) {
-        return nascimento != null ? Period.between(nascimento, LocalDate.now()).getYears() : null;
+        return nascimento != null ? Period.between(nascimento, DataBrasilia.hoje()).getYears() : null;
     }
 }

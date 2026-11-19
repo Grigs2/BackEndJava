@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 
 @RestControllerAdvice
@@ -96,7 +97,7 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ErrorResponseDTO> createResponse(HttpStatus status, String error, String message, HttpServletRequest request) {
         ErrorResponseDTO body = new ErrorResponseDTO(
-            LocalDateTime.now(),
+            DataBrasilia.agora(),
             status.value(),
             error,
             message,

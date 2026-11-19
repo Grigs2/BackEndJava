@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -49,14 +50,14 @@ public class AusenciaService {
 
     @Transactional(readOnly = true)
     public List<AusenciaDTO> listar(Long idDependente) {
-        return ausenciaRepository.findByDependenteIdAndDataGreaterThanEqualOrderByDataAsc(idDependente, LocalDate.now())
+        return ausenciaRepository.findByDependenteIdAndDataGreaterThanEqualOrderByDataAsc(idDependente, DataBrasilia.hoje())
                 .stream().map(AusenciaDTO::toDTO).toList();
     }
 
     @Transactional
     public AusenciaDTO registrar(Long idDependente, Long atorUsuarioId, LocalDate data, String trecho, String motivo) {
         String t = normalizarTrecho(trecho);
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = DataBrasilia.hoje();
         if (data == null || data.isBefore(hoje) || data.isAfter(hoje.plusDays(DIAS_MAXIMOS))) {
             throw new BusinessException("Escolha uma data entre hoje e os próximos " + DIAS_MAXIMOS + " dias");
         }

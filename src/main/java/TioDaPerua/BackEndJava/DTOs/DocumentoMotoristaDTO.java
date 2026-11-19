@@ -4,6 +4,7 @@ import TioDaPerua.BackEndJava.entities.DocumentoMotorista;
 import TioDaPerua.BackEndJava.enums.StatusDocumento;
 import TioDaPerua.BackEndJava.enums.TipoDocumento;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -25,7 +26,7 @@ public record DocumentoMotoristaDTO(
         StatusDocumento status = documento.getStatus();
         if (status == StatusDocumento.APROVADO
                 && documento.getDataValidade() != null
-                && documento.getDataValidade().isBefore(LocalDate.now())) {
+                && documento.getDataValidade().isBefore(DataBrasilia.hoje())) {
             status = StatusDocumento.VENCIDO;
         }
         return new DocumentoMotoristaDTO(

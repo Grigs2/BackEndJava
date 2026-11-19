@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 
 @Component
@@ -43,6 +44,6 @@ public class SecurityJsonExceptionHandler implements AuthenticationEntryPoint, A
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), new ErrorResponseDTO(
-                LocalDateTime.now(), status.value(), error, message, request.getRequestURI()));
+                DataBrasilia.agora(), status.value(), error, message, request.getRequestURI()));
     }
 }

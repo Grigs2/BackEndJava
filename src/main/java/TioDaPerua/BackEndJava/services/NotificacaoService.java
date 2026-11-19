@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -149,7 +150,7 @@ public class NotificacaoService {
 
     @Transactional
     public int marcarTodasLidas(Long usuarioId) {
-        return notificacaoRepository.marcarTodasLidas(usuarioId, LocalDateTime.now());
+        return notificacaoRepository.marcarTodasLidas(usuarioId, DataBrasilia.agora());
     }
 
     public void visualizarNotificacao(Long id) {
@@ -158,7 +159,7 @@ public class NotificacaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Notificação não encontrada com id: " + id));
         if (!Boolean.TRUE.equals(n.getVisto())) {
             n.setVisto(true);
-            n.setLidaEm(LocalDateTime.now());
+            n.setLidaEm(DataBrasilia.agora());
             notificacaoRepository.save(n);
         }
     }
@@ -201,7 +202,7 @@ public class NotificacaoService {
             throw new ResourceNotFoundException("Um ou mais destinatários de notificação não foram encontrados");
         }
 
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         List<Notificacao> notificacoes = destinatarioIds.stream()
                 .map(destinatarioId -> {
                     Notificacao notificacao = new Notificacao();
@@ -226,7 +227,7 @@ public class NotificacaoService {
     @Scheduled(cron = "0 30 3 * * *", zone = "UTC")
     @Transactional
     public void expurgarNotificacoesAntigas() {
-        notificacaoRepository.deleteByDataBefore(LocalDateTime.now().minusDays(RETENCAO_DIAS));
+        notificacaoRepository.deleteByDataBefore(DataBrasilia.agora().minusDays(RETENCAO_DIAS));
     }
 
     private static String chave(Contexto ctx, Long destinatarioId) {

@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -111,7 +112,7 @@ public class HistoricoService {
     }
 
     static LocalDate[] faixa(LocalDate de, LocalDate ate) {
-        LocalDate fim = ate == null ? LocalDate.now() : ate;
+        LocalDate fim = ate == null ? DataBrasilia.hoje() : ate;
         LocalDate inicio = de == null ? fim.minusDays(DIAS_PADRAO) : de;
         if (inicio.isAfter(fim)) throw new BusinessException("A data inicial deve ser anterior à final");
         if (inicio.plusDays(DIAS_MAXIMOS).isBefore(fim)) throw new BusinessException("Consulte no máximo 1 ano por vez");
