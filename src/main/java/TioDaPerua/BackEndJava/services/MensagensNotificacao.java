@@ -84,6 +84,15 @@ public final class MensagensNotificacao {
                 primeiroNome(m == null ? null : m.getNome(), "O motorista") + " saiu para a " + viagem(v) + ".");
     }
 
+    /** Aviso de que o aluno é o próximo da rota: na ida, a próxima busca; na volta, a próxima entrega. */
+    public static Texto proximo(String nomeAluno, Viagem v, boolean ida) {
+        Motorista m = v == null ? null : v.getMotorista();
+        String motorista = primeiroNome(m == null ? null : m.getNome(), "O motorista");
+        String aluno = primeiroNome(nomeAluno, "o aluno");
+        return new Texto("Você é o próximo",
+                motorista + (ida ? " está indo buscar " : " está indo deixar ") + aluno + " agora. Fique atento.");
+    }
+
     public static Texto finalizada(Viagem v) {
         return new Texto("Viagem concluída", "A " + viagem(v) + " de hoje foi concluída.");
     }

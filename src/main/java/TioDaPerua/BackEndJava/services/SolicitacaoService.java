@@ -360,12 +360,7 @@ public class SolicitacaoService {
         if (jaNaViagem) {
             throw new ConflictException("O aluno já faz parte desta viagem");
         }
-        Long motoristaId = viagem.getMotorista() != null ? viagem.getMotorista().getId() : null;
-        boolean vinculoAtivo = motoristaId != null && viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(
-                dependente.getEscola().getId(), motoristaId, List.of(StatusVinculoEscola.ATIVO));
-        if (!vinculoAtivo) {
-            throw new BusinessException("O motorista não tem vínculo ativo com a escola " + dependente.getEscola().getNome());
-        }
+        // O vínculo motorista + escola é opcional: serve de selo de confiança, não de requisito.
     }
 
     static String normalizar(String texto) {
