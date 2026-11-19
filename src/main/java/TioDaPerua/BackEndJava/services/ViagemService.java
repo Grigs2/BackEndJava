@@ -206,7 +206,8 @@ public class ViagemService {
                                 + " ausente ou sem CEP validado");
                     }
                     if (!escolasComVinculoAtivo.contains(escola.getId())) {
-                        bloqueios.add("Não há vínculo ativo com a escola " + (escola.getNome() != null ? escola.getNome() : escola.getId()));
+                        // Vínculo com a escola é opcional: só avisa, não impede iniciar.
+                        avisos.add("Não há vínculo ativo com a escola " + (escola.getNome() != null ? escola.getNome() : escola.getId()));
                     }
                 }
 
@@ -856,6 +857,7 @@ public class ViagemService {
         viagemPresencaRepository.save(presenca);
         registrarHistoricoViagemPresenca(presenca, anterior, status, atorUsuarioId, null, null, Instant.now());
         notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, status);
+        notificarProximaParada(atorUsuarioId, viagemDia);
 
         return gerarParadasViagemDia(idViagemDia);
     }
@@ -944,6 +946,7 @@ public class ViagemService {
                 presenca, atual, evento.statusNovo(), atorUsuarioId, evento.idEvento(),
                 evento.ocorridoEm(), Instant.now());
         notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, evento.statusNovo());
+        notificarProximaParada(atorUsuarioId, viagemDia);
 
         return resultadoOffline(evento, StatusEventoSincronizacao.APLICADO, evento.statusNovo(), null);
     }
@@ -1202,8 +1205,61 @@ public class ViagemService {
             localizacaoViagemAtualRepository.deleteByViagemDiaId(idViagemDia);
         }
         notificarResponsaveisDaExecucao(atorUsuarioId, viagemDia, status, motivoNormalizado);
+        if (status == StatusViagemDia.EM_ANDAMENTO) {
+            notificarProximaParada(atorUsuarioId, viagemDia);
+        }
 
         return viagemDia;
+    }
+
+    /**
+     * "Você é o próximo": avisa os responsáveis dos alunos da próxima parada de casa ainda pendente.
+     * Na ida a parada de casa é a busca (aluno ESPERANDO); na volta é a entrega (aluno EMBARCADO).
+     * Cada aluno recebe o aviso uma vez por execução (chave de deduplicação). Falhas aqui não desfazem a presença.
+     */
+    private void notificarProximaParada(Long atorUsuarioId, ViagemDia viagemDia) {
+        if (viagemDia == null || viagemDia.getId() == null || viagemDia.getStatus() != StatusViagemDia.EM_ANDAMENTO) {
+            return;
+        }
+        try {
+            Viagem viagem = viagemDia.getViagem();
+            boolean ida = viagem != null && isViagemIda(viagem.getPeriodo());
+            ParadaDTO proxima = proximaParadaPendente(gerarParadasViagemDia(viagemDia.getId()), ida);
+            if (proxima == null || proxima.tipoParada() != TipoParada.RESPONSAVEL) {
+                return;
+            }
+            String pendente = ida ? StatusViagemPresenca.ESPERANDO.name() : StatusViagemPresenca.EMBARCADO.name();
+            for (DependenteParadaDTO aluno : proxima.listaDependentes()) {
+                if (aluno.id() == null || !pendente.equals(aluno.statusEmbarque())) continue;
+                Set<Long> destinatarioIds = responsavelRepository.findUsuariosAtivosPorDependentes(List.of(aluno.id()))
+                        .stream()
+                        .map(DependenteResponsavelUsuarioProjection::getUsuarioId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                if (destinatarioIds.isEmpty()) continue;
+                MensagensNotificacao.Texto texto = MensagensNotificacao.proximo(aluno.nomeDependente(), viagem, ida);
+                notificacaoService.criarNotificacoesAutomaticas(
+                        atorUsuarioId, destinatarioIds, texto.titulo(), texto.mensagem(),
+                        new NotificacaoService.Contexto(TipoNotificacao.PROXIMO_ALUNO, viagemDia.getId(), aluno.id(),
+                                "proximo:" + viagemDia.getId() + ":" + aluno.id()));
+            }
+        } catch (RuntimeException e) {
+            // O aviso é complementar: não pode impedir o registro de presença nem o início da viagem.
+        }
+    }
+
+    /** Primeira parada (fora as do motorista) com aluno ainda pendente nela, na ordem atual da rota. */
+    static ParadaDTO proximaParadaPendente(List<ParadaDTO> paradas, boolean ida) {
+        if (paradas == null) return null;
+        for (ParadaDTO parada : paradas) {
+            if (parada.tipoParada() == TipoParada.MOTORISTA || parada.listaDependentes() == null) continue;
+            boolean embarqueAqui = (parada.tipoParada() == TipoParada.RESPONSAVEL) == ida;
+            String pendente = embarqueAqui ? StatusViagemPresenca.ESPERANDO.name() : StatusViagemPresenca.EMBARCADO.name();
+            if (parada.listaDependentes().stream().anyMatch(d -> pendente.equals(d.statusEmbarque()))) {
+                return parada;
+            }
+        }
+        return null;
     }
 
     private void validarAtorMotorista(Viagem viagem, Long atorUsuarioId) {

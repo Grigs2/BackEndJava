@@ -66,9 +66,6 @@ class SolicitacaoBidirecionalTest {
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
         when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        when(viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(1L, 4L, List.of(StatusVinculoEscola.ATIVO)))
-                .thenReturn(true);
-
         Solicitacao s = service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true);
 
         assertEquals(OrigemSolicitacao.RESPONSAVEL, s.getOrigem());
@@ -189,7 +186,7 @@ class SolicitacaoBidirecionalTest {
     }
 
     @Test
-    void pedidoNaoEnviadoSeMotoristaNaoTemVinculoAtivoComAEscola() {
+    void pedidoEnviadoMesmoSemVinculoDoMotoristaComAEscola() {
         Responsavel responsavel = responsavel();
         Escola escola = escola(1L, "EMEF Pedro II");
         Dependente dependente = dependente(responsavel, escola);
@@ -199,10 +196,11 @@ class SolicitacaoBidirecionalTest {
         when(solicitacaoRepository.findPendenteByDependenteAndViagem(7L, 3L)).thenReturn(Optional.empty());
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
 
-        BusinessException e = assertThrows(BusinessException.class,
-                () -> service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true));
-        assertTrue(e.getMessage().contains("vínculo ativo"));
-        verify(solicitacaoRepository, never()).save(any());
+        when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.solicitarPeloResponsavel(3L, 7L, USUARIO_RESPONSAVEL, true);
+
+        verify(solicitacaoRepository).save(any());
     }
 
     @Test
@@ -236,9 +234,6 @@ class SolicitacaoBidirecionalTest {
         when(solicitacaoRepository.findPendenteByDependenteAndViagem(7L, 3L)).thenReturn(Optional.empty());
         when(viagemDependenteRepository.findByViagemIdAndDependenteId(3L, 7L)).thenReturn(Optional.empty());
         when(solicitacaoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        when(viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(1L, 4L, List.of(StatusVinculoEscola.ATIVO)))
-                .thenReturn(true);
 
         Solicitacao s = service.solicitarDependente(3L, 7L, USUARIO_MOTORISTA);
 

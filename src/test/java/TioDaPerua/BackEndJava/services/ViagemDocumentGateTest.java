@@ -83,15 +83,21 @@ class ViagemDocumentGateTest {
     }
 
     @Test
-    void naoIniciaSemVinculoComAEscola() {
+    void iniciaSemVinculoComAEscolaEMostraAviso() {
         ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
         prepararProntidao(execucao, false);
         when(viagemDiaRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(execucao));
+        when(viagemRepository.findById(77L)).thenReturn(Optional.of(execucao.getViagem()));
+        when(viagemDiaRepository.save(any(ViagemDia.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(documentoMotoristaService.listarPendenciasParaInicio(42L)).thenReturn(List.of());
+        when(usuarioRepository.findById(100L)).thenReturn(Optional.of(execucao.getViagem().getMotorista().getUsuario()));
 
-        var e = org.junit.jupiter.api.Assertions.assertThrows(TioDaPerua.BackEndJava.exceptions.BusinessException.class,
-                () -> service.alterarStatusViagemDia(9L, "EM_ANDAMENTO", null, 100L));
-        org.junit.jupiter.api.Assertions.assertTrue(e.getMessage().contains("Não há vínculo ativo com a escola 12"));
+        service.alterarStatusViagemDia(9L, "EM_ANDAMENTO", null, 100L);
+        org.junit.jupiter.api.Assertions.assertEquals(StatusViagemDia.EM_ANDAMENTO, execucao.getStatus());
+
+        var prontidao = service.consultarProntidao(77L);
+        org.junit.jupiter.api.Assertions.assertTrue(prontidao.avisos().stream()
+                .anyMatch(a -> a.contains("Não há vínculo ativo com a escola 12")));
     }
 
     @Test

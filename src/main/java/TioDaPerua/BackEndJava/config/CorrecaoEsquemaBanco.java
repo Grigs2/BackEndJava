@@ -26,7 +26,11 @@ public class CorrecaoEsquemaBanco implements ApplicationRunner {
 
     /** Restrições CHECK de colunas de enum que precisam aceitar valores novos. */
     static final List<String> COMANDOS = List.of(
-            "ALTER TABLE IF EXISTS public.viagem DROP CONSTRAINT IF EXISTS viagem_periodo_check"
+            "ALTER TABLE IF EXISTS public.viagem DROP CONSTRAINT IF EXISTS viagem_periodo_check",
+            // INTERROMPIDA entrou depois em StatusViagemDia; o CHECK antigo recusava o valor.
+            "ALTER TABLE IF EXISTS public.viagem_dia DROP CONSTRAINT IF EXISTS viagem_dia_status_check",
+            "ALTER TABLE IF EXISTS public.historico_viagem_dia DROP CONSTRAINT IF EXISTS historico_viagem_dia_status_anterior_check",
+            "ALTER TABLE IF EXISTS public.historico_viagem_dia DROP CONSTRAINT IF EXISTS historico_viagem_dia_status_novo_check"
     );
 
     private final JdbcTemplate jdbcTemplate;
