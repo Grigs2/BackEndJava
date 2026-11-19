@@ -29,6 +29,23 @@ public interface ViagemDependenteRepository extends JpaRepository<ViagemDependen
     @Query("SELECT vd FROM ViagemDependente vd WHERE vd.dependente.id = :dependenteId AND vd.ativo = true")
     List<ViagemDependente> findAtivosByDependenteId(Long dependenteId);
 
+    /**
+     * O dependente já tem acordo ativo em outra viagem ativa do mesmo período (ex.: duas viagens de manhã-ida)?
+     * As viagens se repetem todos os dias do período, então dois acordos no mesmo período colidiriam em todas as datas.
+     */
+    @Query("""
+        SELECT COUNT(vd) > 0 FROM ViagemDependente vd
+        JOIN vd.viagem v
+        WHERE vd.ativo = true
+        AND v.ativo = true
+        AND vd.dependente.id = :dependenteId
+        AND v.periodo = :periodo
+        AND v.id <> :viagemId
+    """)
+    boolean existeAcordoAtivoNoPeriodo(@org.springframework.data.repository.query.Param("dependenteId") Long dependenteId,
+                                       @org.springframework.data.repository.query.Param("periodo") TioDaPerua.BackEndJava.enums.Periodo periodo,
+                                       @org.springframework.data.repository.query.Param("viagemId") Long viagemId);
+
     /** Acordo ativo entre o responsável e o motorista: algum dependente do responsável está em viagem ativa dele. */
     @Query("""
         SELECT COUNT(vd) > 0 FROM ViagemDependente vd

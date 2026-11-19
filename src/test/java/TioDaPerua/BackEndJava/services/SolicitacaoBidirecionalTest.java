@@ -155,6 +155,60 @@ class SolicitacaoBidirecionalTest {
     }
 
     @Test
+    void responsavelNaoAceitaSegundaViagemNoMesmoPeriodo() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
+        s.getViagem().setPeriodo(TioDaPerua.BackEndJava.enums.Periodo.MANHA_IDA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(viagemDependenteRepository.existeAcordoAtivoNoPeriodo(7L, TioDaPerua.BackEndJava.enums.Periodo.MANHA_IDA, 3L))
+                .thenReturn(true);
+
+        ConflictException e = assertThrows(ConflictException.class,
+                () -> service.responderSolicitacao(5L, true, true, USUARIO_RESPONSAVEL));
+        assertTrue(e.getMessage().contains("já tem uma viagem ativa neste período"));
+        verify(viagemDependenteRepository, never()).save(any());
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    void motoristaNaoAceitaPedidoSeAlunoJaTemViagemNoPeriodo() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.RESPONSAVEL);
+        s.getViagem().setPeriodo(TioDaPerua.BackEndJava.enums.Periodo.TARDE_VOLTA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(viagemDependenteRepository.existeAcordoAtivoNoPeriodo(7L, TioDaPerua.BackEndJava.enums.Periodo.TARDE_VOLTA, 3L))
+                .thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> service.responderComoMotorista(5L, true, USUARIO_MOTORISTA));
+        verify(viagemDependenteRepository, never()).save(any());
+    }
+
+    @Test
+    void aceitaViagemDeOutroPeriodo() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
+        s.getViagem().setPeriodo(TioDaPerua.BackEndJava.enums.Periodo.MANHA_VOLTA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(viagemDependenteRepository.existeAcordoAtivoNoPeriodo(7L, TioDaPerua.BackEndJava.enums.Periodo.MANHA_VOLTA, 3L))
+                .thenReturn(false);
+        when(solicitacaoRepository.save(s)).thenReturn(s);
+
+        Solicitacao resposta = service.responderSolicitacao(5L, true, true, USUARIO_RESPONSAVEL);
+
+        assertTrue(resposta.isAceito());
+        verify(viagemDependenteRepository).save(any());
+    }
+
+    @Test
+    void recusarNaoVerificaPeriodo() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
+        s.getViagem().setPeriodo(TioDaPerua.BackEndJava.enums.Periodo.MANHA_IDA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(solicitacaoRepository.save(s)).thenReturn(s);
+
+        service.responderSolicitacao(5L, false, null, USUARIO_RESPONSAVEL);
+
+        verify(viagemDependenteRepository, never()).existeAcordoAtivoNoPeriodo(any(), any(), any());
+    }
+
+    @Test
     void motoristaNaoRespondeOProprioConvite() {
         Solicitacao s = solicitacaoAberta(OrigemSolicitacao.MOTORISTA);
         when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));

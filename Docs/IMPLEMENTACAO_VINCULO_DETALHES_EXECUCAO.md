@@ -37,7 +37,7 @@ A validação de documentos pelo administrador (`/Admin/Documentos/...`) continu
 
 | Arquivo | Mudança |
 |---|---|
-| `DTOs/ContraparteDTO.java` (novo) | Nome, telefone, e-mail mascarado, CPF mascarado, bairro/cidade/UF, viagem, escolas; do motorista: veículo (placa mascarada) e avaliação média; do aluno: nome, idade, escola, período, bairro e cidade. |
+| `DTOs/ContraparteDTO.java` (novo) | Nome, telefone, e-mail mascarado, CPF mascarado, bairro/cidade/UF, viagem, escolas; do motorista: veículo (placa mascarada) e avaliação média; do aluno: nome, idade, escola, período, bairro e cidade. **Atualizado em 18/11/2026:** `cpf` completo do motorista com vínculo ativo e `vinculoAtivo` (ver `IMPLEMENTACAO_REDESENHO_RESPONSAVEL_BACK.md`). |
 | `services/ContraparteService.java` (novo) | `motoristaDaSolicitacao` (só responsáveis do aluno) e `responsavelDaSolicitacao` (só o motorista da viagem). Outros usuários recebem 403. |
 | `controllers/ResponsavelController.java` | `GET /Responsavel/Solicitacoes/{id}/Contraparte`: o responsável vê o motorista. |
 | `controllers/MotoristaController.java` | `GET /Motorista/Solicitacoes/{id}/Contraparte`: o motorista vê o responsável e o aluno. |

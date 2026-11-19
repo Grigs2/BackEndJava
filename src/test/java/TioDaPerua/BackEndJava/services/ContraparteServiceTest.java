@@ -11,6 +11,7 @@ import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.Veiculo;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
+import TioDaPerua.BackEndJava.enums.StatusSolicitacao;
 import TioDaPerua.BackEndJava.repositories.AvaliacaoRepository;
 import TioDaPerua.BackEndJava.repositories.EnderecoDependenteRepository;
 import TioDaPerua.BackEndJava.repositories.SolicitacaoRepository;
@@ -22,13 +23,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /** Pop-up de dados da outra parte: só participantes veem; nome e telefone completos, o resto mascarado. */
@@ -59,6 +63,57 @@ class ContraparteServiceTest {
         assertEquals("Ipiranga", c.bairro());
         assertEquals(List.of("EMEF Pedro II"), c.escolasAtendidas());
         assertNull(c.avaliacaoMedia());
+        // Sem vínculo ativo (convite pendente): CPF completo não é enviado.
+        assertNull(c.cpf());
+        assertFalse(c.vinculoAtivo());
+    }
+
+    @Test
+    void responsavelComVinculoAtivoVeCpfCompletoDoMotorista() {
+        Solicitacao s = solicitacao();
+        s.setRespondido(true);
+        s.setAceito(true);
+        s.setStatus(StatusSolicitacao.ACEITA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(avaliacaoRepository.listarDoMotorista(4L)).thenReturn(List.of());
+
+        ContraparteDTO c = service.motoristaDaSolicitacao(5L, USUARIO_RESPONSAVEL);
+
+        assertTrue(c.vinculoAtivo());
+        assertEquals("111.444.777-35", c.cpf());
+        assertEquals("(11) 97777-6666", c.telefone());
+    }
+
+    @Test
+    void vinculoEncerradoVoltaAMascarar() {
+        Solicitacao s = solicitacao();
+        s.setRespondido(true);
+        s.setAceito(true);
+        s.setStatus(StatusSolicitacao.ACEITA);
+        s.setDataFim(LocalDateTime.now());
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(avaliacaoRepository.listarDoMotorista(4L)).thenReturn(List.of());
+
+        ContraparteDTO c = service.motoristaDaSolicitacao(5L, USUARIO_RESPONSAVEL);
+
+        assertFalse(c.vinculoAtivo());
+        assertNull(c.cpf());
+        assertEquals("***.444.777-**", c.cpfMascarado());
+    }
+
+    @Test
+    void motoristaNuncaRecebeCpfCompletoDoResponsavel() {
+        Solicitacao s = solicitacao();
+        s.setRespondido(true);
+        s.setAceito(true);
+        s.setStatus(StatusSolicitacao.ACEITA);
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+        when(enderecoDependenteRepository.findByDependenteIdAndAtivoTrueOrderById(7L)).thenReturn(List.of());
+
+        ContraparteDTO c = service.responsavelDaSolicitacao(5L, USUARIO_MOTORISTA);
+
+        assertNull(c.cpf());
+        assertEquals("***.982.247-**", c.cpfMascarado());
     }
 
     @Test

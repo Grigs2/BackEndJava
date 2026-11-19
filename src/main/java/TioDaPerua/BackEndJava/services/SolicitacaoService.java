@@ -290,6 +290,9 @@ public class SolicitacaoService {
     }
 
     private Solicitacao registrarResposta(Solicitacao solicitacao, boolean aceito) {
+        if (aceito) {
+            validarPeriodoLivre(solicitacao);
+        }
         solicitacao.setRespondido(true);
         solicitacao.setAceito(aceito);
         solicitacao.setStatus(aceito ? StatusSolicitacao.ACEITA : StatusSolicitacao.RECUSADA);
@@ -298,6 +301,22 @@ public class SolicitacaoService {
             encerrarDuplicadas(solicitacao);
         }
         return solicitacaoRepository.save(solicitacao);
+    }
+
+    /**
+     * Um aluno não pode estar em duas viagens do mesmo período: como as viagens se repetem em todas as datas,
+     * aceitar uma segunda viagem de, por exemplo, manhã-ida colocaria o aluno em duas execuções na mesma data e período.
+     */
+    private void validarPeriodoLivre(Solicitacao solicitacao) {
+        Viagem viagem = solicitacao.getViagem();
+        Dependente dependente = solicitacao.getDependente();
+        if (viagem == null || dependente == null || viagem.getPeriodo() == null) {
+            return;
+        }
+        if (viagemDependenteRepository.existeAcordoAtivoNoPeriodo(dependente.getId(), viagem.getPeriodo(), viagem.getId())) {
+            throw new ConflictException(dependente.getNome()
+                    + " já tem uma viagem ativa neste período. Encerre o vínculo atual antes de aceitar outro.");
+        }
     }
 
     /**

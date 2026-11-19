@@ -1125,6 +1125,28 @@ http://localhost:8080/TioDaPerua/api/Responsavel/ResponderSolicitacao/{id_solici
 Path Variables
 * `id_solicitacao`: ID da solicitação enviada pelo motorista.
 
+Regras de Negócio Aplicadas (atualizado em 18/11/2026)
+* Ao **aceitar**, o aluno não pode ter acordo ativo em **outra viagem ativa do mesmo período** (ex.: duas viagens `MANHA_IDA`). Como as viagens se repetem em todas as datas, isso colocaria o aluno em duas execuções na mesma data e período. Resposta **409 Conflict** com a mensagem "&lt;nome&gt; já tem uma viagem ativa neste período. Encerre o vínculo atual antes de aceitar outro." A mesma regra vale quando o motorista aceita um pedido de vaga (`/Motorista/Solicitacoes/{id}/Responder`). Recusar não é afetado.
+
+---
+
+### Dados da outra parte da solicitação (Contraparte)
+
+Caso de Uso
+Conferir os dados do motorista (responsável) ou do responsável e do aluno (motorista) antes ou depois de aceitar
+
+Método HTTP
+GET
+
+URL Local
+http://localhost:8080/TioDaPerua/api/Responsavel/Solicitacoes/{id}/Contraparte
+http://localhost:8080/TioDaPerua/api/Motorista/Solicitacoes/{id}/Contraparte
+
+Resposta (`ContraparteDTO`)
+* `nome` e `telefone` completos; `emailMascarado`, `cpfMascarado`, `veiculo.placaMascarada` mascarados; endereço só bairro, cidade e UF.
+* `vinculoAtivo` (novo, 18/11/2026): `true` quando a solicitação foi aceita e não foi encerrada.
+* `cpf` (novo, 18/11/2026): CPF **completo** do motorista, enviado somente ao responsável e somente com `vinculoAtivo = true`. Nos demais casos (convite pendente, vínculo encerrado, motorista vendo o responsável) vem `null`.
+
 ---
 
 ### Listar Escolas Cadastradas

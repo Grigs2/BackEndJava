@@ -10,6 +10,7 @@ import TioDaPerua.BackEndJava.entities.Responsavel;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
 import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.entities.Viagem;
+import TioDaPerua.BackEndJava.enums.StatusSolicitacao;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.repositories.AvaliacaoRepository;
 import TioDaPerua.BackEndJava.repositories.EnderecoDependenteRepository;
@@ -65,6 +66,7 @@ public class ContraparteService {
                 v.getModelo(), v.getCor(), v.getAno(), v.getCapacidade(), mascararPlaca(v.getPlaca()));
         var avaliacoes = avaliacaoRepository.listarDoMotorista(m.getId());
         Double media = avaliacoes.isEmpty() ? null : avaliacaoRepository.mediaDoMotorista(m.getId());
+        boolean ativo = vinculoAtivo(s);
         return new ContraparteDTO(s.getId(), "MOTORISTA", m.getNome(),
                 u != null ? u.getTelefone() : null,
                 u != null ? mascararEmail(u.getEmail()) : null,
@@ -76,7 +78,9 @@ public class ContraparteService {
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 viagem.getEscolas() == null ? List.of() : viagem.getEscolas().stream().map(Escola::getNome).toList(),
                 veiculo, media, avaliacoes.size(),
-                aluno(dependente));
+                aluno(dependente),
+                ativo ? formatarCpf(m.getCpf()) : null,
+                ativo);
     }
 
     /** O motorista da viagem vê o responsável e o aluno da solicitação. */
@@ -106,7 +110,21 @@ public class ContraparteService {
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 viagem.getEscolas() == null ? List.of() : viagem.getEscolas().stream().map(Escola::getNome).toList(),
                 null, null, null,
-                aluno);
+                aluno,
+                null,
+                vinculoAtivo(s));
+    }
+
+    /** Vínculo de transporte em vigor: solicitação aceita e não encerrada. */
+    static boolean vinculoAtivo(Solicitacao s) {
+        return s.isAceito() && s.getDataFim() == null && s.getStatusEfetivo() == StatusSolicitacao.ACEITA;
+    }
+
+    /** "52998224725" → "529.982.247-25"; valores fora do formato voltam como estão. */
+    static String formatarCpf(String cpf) {
+        String d = cpf == null ? "" : cpf.replaceAll("\\D", "");
+        if (d.length() != 11) return cpf;
+        return d.substring(0, 3) + "." + d.substring(3, 6) + "." + d.substring(6, 9) + "-" + d.substring(9);
     }
 
     private Solicitacao buscar(Long idSolicitacao) {
