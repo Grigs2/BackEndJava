@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -127,7 +128,7 @@ public class DocumentoMotoristaService {
         }
         if (dto.status() == StatusDocumento.APROVADO
                 && (documento.getDataValidade() == null
-                || documento.getDataValidade().isBefore(LocalDate.now()))) {
+                || documento.getDataValidade().isBefore(DataBrasilia.hoje()))) {
             throw new BusinessException("Não é possível aprovar documento vencido ou sem validade");
         }
 
@@ -188,7 +189,7 @@ public class DocumentoMotoristaService {
                         .filter(documento -> documento.getStatus() == StatusDocumento.APROVADO)
                         .filter(documento -> documento.getSubstituidoEm() == null)
                         .filter(documento -> documento.getDataValidade() != null
-                                && !documento.getDataValidade().isBefore(LocalDate.now()))
+                                && !documento.getDataValidade().isBefore(DataBrasilia.hoje()))
                         .filter(documento -> tipo == TipoDocumento.CNH
                                 || (documento.getVeiculo() != null
                                 && documento.getVeiculo().getId().equals(motorista.getVeiculo().getId())))
@@ -210,7 +211,7 @@ public class DocumentoMotoristaService {
                 if (dto.dataRealizacao() == null) {
                     throw new BusinessException("A data da vistoria é obrigatória");
                 }
-                if (dto.dataRealizacao().isAfter(LocalDate.now())) {
+                if (dto.dataRealizacao().isAfter(DataBrasilia.hoje())) {
                     throw new BusinessException("A data da vistoria não pode estar no futuro");
                 }
                 if (dto.dataValidade().isBefore(dto.dataRealizacao())) {

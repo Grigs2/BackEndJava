@@ -28,4 +28,8 @@ public interface ViagemRepository extends JpaRepository<Viagem, Long> {
     Optional<Viagem> findByIdForUpdate(Long id);
 
     boolean existsByIdAndMotorista_Usuario_Id(Long viagemId, Long usuarioId);
+
+    /** Motoristas com viagem ativa para alguma das escolas (com ou sem vínculo formal com elas). */
+    @Query("SELECT DISTINCT v.motorista.id FROM Viagem v JOIN v.escolas e WHERE v.ativo = true AND e.id IN :escolaIds")
+    List<Long> listarIdsMotoristasComViagemParaEscolas(java.util.Collection<Long> escolaIds);
 }

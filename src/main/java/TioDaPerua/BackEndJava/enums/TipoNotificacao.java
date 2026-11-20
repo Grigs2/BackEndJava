@@ -9,6 +9,8 @@ public enum TipoNotificacao {
     EMBARQUE(Grupo.VIAGEM, Prioridade.NORMAL),
     DESEMBARQUE(Grupo.VIAGEM, Prioridade.NORMAL),
     VIAGEM_FINALIZADA(Grupo.VIAGEM, Prioridade.NORMAL),
+    /** O aluno está na próxima parada da rota ("Você é o próximo"). */
+    PROXIMO_ALUNO(Grupo.VIAGEM, Prioridade.ALTA),
     AUSENCIA(Grupo.ALERTA, Prioridade.ALTA),
     AUSENCIA_INFORMADA(Grupo.ALERTA, Prioridade.NORMAL),
     ATRASO(Grupo.ALERTA, Prioridade.ALTA),

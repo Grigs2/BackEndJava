@@ -301,7 +301,7 @@ Consultas e alterações administrativas são auditadas com ator, ação, alvo, 
 | Criar Viagem (Rota) | `POST /Viagem/CriarViagem/{id}` | ViagemController |
 | Visualizar Detalhes da Viagem | `GET /Viagem/Visualizar/{id}` | ViagemController |
 | Listar Viagens Ativas | `GET /Viagem/ListarViagens/{id}` | ViagemController |
-| Consultar agenda virtual de 7 dias | `GET /Viagem/Agenda/{idMotorista}` | ViagemController |
+| Consultar agenda virtual (padrão 7 dias, intervalo opcional) | `GET /Viagem/Agenda/{idMotorista}?de=yyyy-MM-dd&ate=yyyy-MM-dd` | ViagemController |
 | Consultar prontidão da viagem | `GET /Viagem/Prontidao/{idViagem}` | ViagemController |
 | Desativar Viagem | `PUT /Viagem/DesativarViagem/{id}` | ViagemController |
 | Histórico de Viagens | `GET /Viagem/Historico/{id}` | ViagemController |
@@ -1930,7 +1930,7 @@ Não possui request body.
 
 ### Agenda virtual e prontidão
 
-`GET /Viagem/Agenda/{idMotorista}` retorna cada itinerário ativo para hoje e os seis dias seguintes. A agenda não cria execuções futuras: itens sem execução retornam `materializada: false`, `idViagemDia: null` e `status: null`.
+`GET /Viagem/Agenda/{idMotorista}` retorna cada itinerário ativo por dia. Sem parâmetros, o intervalo é hoje (fuso America/Sao_Paulo, não o UTC do servidor) até mais seis dias (7 dias no total). Com `de` e `ate` (`yyyy-MM-dd`), o intervalo é usado com as duas pontas inclusivas; `ate` anterior a `de` retorna 400. Se só `de` for enviado, o fim é `de` + 6 dias. Itinerários não têm dias da semana configurados: todo itinerário ativo aparece em todos os dias do intervalo. A agenda não cria execuções futuras: itens sem execução retornam `materializada: false`, `idViagemDia: null` e `status: null`; dias já executados mantêm o status real.
 
 `GET /Viagem/Prontidao/{idViagem}` retorna os bloqueios antes do início:
 

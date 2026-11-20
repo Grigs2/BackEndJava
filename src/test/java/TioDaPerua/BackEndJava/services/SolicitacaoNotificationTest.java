@@ -35,6 +35,7 @@ class SolicitacaoNotificationTest {
     @Mock private ViagemRepository viagemRepository;
     @Mock private ViagemDependenteRepository viagemDependenteRepository;
     @Mock private NotificacaoService notificacaoService;
+    @Mock private ViagemService viagemService;
     @InjectMocks private SolicitacaoService service;
 
     @Test

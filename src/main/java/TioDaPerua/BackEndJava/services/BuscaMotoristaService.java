@@ -67,8 +67,10 @@ public class BuscaMotoristaService {
         if (escolaIds.isEmpty()) {
             return List.of();
         }
-        Set<Long> motoristasDasEscolas = Set.copyOf(
+        // Vínculo com a escola é opcional: entram os vinculados e os que já têm viagem para a escola.
+        Set<Long> motoristasDasEscolas = new java.util.HashSet<>(
                 viagemEscolaRepository.listarIdsMotoristasAtivosDasEscolas(escolaIds, StatusVinculoEscola.ATIVO));
+        motoristasDasEscolas.addAll(viagemRepository.listarIdsMotoristasComViagemParaEscolas(escolaIds));
 
         // Situação do aluno pesquisado em cada viagem, para o app não oferecer "Pedir vaga" onde ele já está.
         List<Long> viagensComAluno = idDependente == null || viagemDependenteRepository == null ? List.of()

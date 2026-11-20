@@ -16,6 +16,8 @@ import org.springframework.security.access.AccessDeniedException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Instant;
@@ -24,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ViagemService {
+
+    private static final ZoneId FUSO_BRASILIA = ZoneId.of("America/Sao_Paulo");
 
     @Autowired
     private ViagemRepository viagemRepository;
@@ -85,10 +89,16 @@ public class ViagemService {
     @Autowired
     private AusenciaInformadaRepository ausenciaInformadaRepository;
 
+    /** Dias da agenda são calendário de Brasília, independentemente do fuso do servidor. */
+    private Clock relogio = Clock.system(FUSO_BRASILIA);
+
     @Transactional(readOnly = true)
-    public List<AgendaViagemDTO> agendaMotorista(Long idMotorista) {
-        LocalDate inicio = LocalDate.now();
-        LocalDate fim = inicio.plusDays(6);
+    public List<AgendaViagemDTO> agendaMotorista(Long idMotorista, LocalDate de, LocalDate ate) {
+        LocalDate inicio = de == null ? LocalDate.now(relogio) : de;
+        LocalDate fim = ate == null ? inicio.plusDays(6) : ate;
+        if (fim.isBefore(inicio)) {
+            throw new BusinessException("Intervalo inválido: 'ate' não pode ser anterior a 'de'");
+        }
         List<Viagem> viagens = viagemRepository.findAtivasByMotoristaId(idMotorista);
         Map<String, ViagemDia> execucoes = viagemDiaRepository
                 .findByMotoristaIdAndDataBetween(idMotorista, inicio, fim).stream()
@@ -196,7 +206,8 @@ public class ViagemService {
                                 + " ausente ou sem CEP validado");
                     }
                     if (!escolasComVinculoAtivo.contains(escola.getId())) {
-                        bloqueios.add("Não há vínculo ativo com a escola " + (escola.getNome() != null ? escola.getNome() : escola.getId()));
+                        // Vínculo com a escola é opcional: só avisa, não impede iniciar.
+                        avisos.add("Não há vínculo ativo com a escola " + (escola.getNome() != null ? escola.getNome() : escola.getId()));
                     }
                 }
 
@@ -247,7 +258,7 @@ public class ViagemService {
         viagemRepository.save(viagem);
 
         viagemDependenteRepository.desativarPorViagemId(idViagem);
-        solicitacaoRepository.encerrarPorViagemId(idViagem, LocalDateTime.now());
+        solicitacaoRepository.encerrarPorViagemId(idViagem, DataBrasilia.agora());
     }
 
     public MotoristaViagemDTO consultarMotorista(Long idViagemDia) {
@@ -409,7 +420,7 @@ public class ViagemService {
 
     @Transactional
     public ViagemDia iniciarViagemDia(Long idViagem, Long atorUsuarioId) {
-        return prepararViagemDia(idViagem, LocalDate.now(), atorUsuarioId);
+        return prepararViagemDia(idViagem, LocalDate.now(relogio), atorUsuarioId);
     }
 
     @Transactional
@@ -417,7 +428,7 @@ public class ViagemService {
         if (idViagem == null || data == null || atorUsuarioId == null) {
             throw new IllegalArgumentException("Viagem, data e usuário responsável pela preparação são obrigatórios");
         }
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(relogio);
         if (data.isBefore(hoje) || data.isAfter(hoje.plusDays(6))) {
             throw new BusinessException("A preparação deve ocorrer entre hoje e os próximos 6 dias");
         }
@@ -436,7 +447,7 @@ public class ViagemService {
         viagemDia.setViagem(viagem);
         viagemDia.setData(data);
         viagemDia.setStatus(StatusViagemDia.PLANEJADA);
-        viagemDia.setDataUltimaAlteracaoStatus(LocalDateTime.now());
+        viagemDia.setDataUltimaAlteracaoStatus(DataBrasilia.agora());
         viagemDia = viagemDiaRepository.save(viagemDia);
         registrarHistoricoViagemDia(viagemDia, null, StatusViagemDia.PLANEJADA, atorUsuarioId, null);
 
@@ -463,6 +474,59 @@ public class ViagemService {
         aplicarAusenciasInformadas(viagemDia, dependenteIds);
         materializarParadas(viagemDia, gerarParadasProjetadas(viagemDia), ativos, enderecosPorDependente);
         return viagemDia;
+    }
+
+    /**
+     * Sincroniza as execuções ainda PLANEJADAS (de hoje em diante, em Brasília) com os vínculos ativos da viagem:
+     * alunos aceitos depois da preparação ganham presença e as paradas são reconstruídas. Execuções já iniciadas
+     * ou encerradas mantêm o snapshot original.
+     */
+    @Transactional
+    public void incluirDependenteEmExecucoesPlanejadas(Long idViagem, Long idDependente) {
+        List<ViagemDia> execucoes = viagemDiaRepository.findByViagemIdAndStatusAndDataGreaterThanEqual(
+                idViagem, StatusViagemDia.PLANEJADA, LocalDate.now(relogio));
+        if (execucoes.isEmpty()) return;
+
+        List<ViagemDependente> vinculados = viagemDependenteRepository.buscarDependentesCompletos(idViagem);
+        if (vinculados.stream().noneMatch(v -> v.getDependente().getId().equals(idDependente))) return;
+        Map<Long, List<EnderecoDependente>> enderecosPorDependente = enderecoDependenteRepository
+                .findByDependenteIdInAndAtivoTrue(vinculados.stream().map(v -> v.getDependente().getId()).toList())
+                .stream()
+                .collect(Collectors.groupingBy(endereco -> endereco.getDependente().getId()));
+
+        for (ViagemDia execucao : execucoes) {
+            Set<Long> comPresenca = viagemPresencaRepository.findByViagemDiaId(execucao.getId()).stream()
+                    .map(presenca -> presenca.getDependente().getId())
+                    .collect(Collectors.toSet());
+            List<ViagemDependente> faltantes = vinculados.stream()
+                    .filter(v -> !comPresenca.contains(v.getDependente().getId()))
+                    .toList();
+            if (faltantes.isEmpty()) continue;
+
+            if (!historicoOrdemParadaRepository.findByViagemDia_IdOrderByOcorridoEmAscIdAsc(execucao.getId()).isEmpty()) {
+                throw new ConflictException("A rota de " + execucao.getData()
+                        + " já foi reordenada; não é possível incluir o aluno automaticamente nesta execução");
+            }
+
+            List<Long> novosIds = new ArrayList<>();
+            for (ViagemDependente vd : faltantes) {
+                Dependente dependente = vd.getDependente();
+                ViagemPresenca presenca = new ViagemPresenca();
+                presenca.setViagemDia(execucao);
+                presenca.setDependente(dependente);
+                presenca.setStatus(StatusViagemPresenca.ESPERANDO);
+                preencherSnapshots(presenca, dependente,
+                        enderecosPorDependente.getOrDefault(dependente.getId(), List.of()));
+                viagemPresencaRepository.save(presenca);
+                novosIds.add(dependente.getId());
+            }
+            viagemPresencaRepository.flush();
+            aplicarAusenciasInformadas(execucao, novosIds);
+
+            viagemParadaRepository.deleteAll(viagemParadaRepository.listarPorViagemDia(execucao.getId()));
+            viagemParadaRepository.flush();
+            materializarParadas(execucao, gerarParadasProjetadas(execucao), vinculados, enderecosPorDependente);
+        }
     }
 
     /**
@@ -589,7 +653,7 @@ public class ViagemService {
         List<HistoricoOrdemParada> historicos = new ArrayList<>();
         Usuario ator = usuarioRepository.findById(atorUsuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado"));
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         int deslocamento = paradasAtuais.size();
         for (int indice = 0; indice < idsParadas.size(); indice++) {
             ViagemParada parada = paradasPorId.get(idsParadas.get(indice));
@@ -784,15 +848,16 @@ public class ViagemService {
         }
 
         if (status == StatusViagemPresenca.EMBARCADO) {
-            presenca.setHorarioEmbarque(LocalDateTime.now());
+            presenca.setHorarioEmbarque(DataBrasilia.agora());
         } else if (status == StatusViagemPresenca.DESEMBARCADO) {
-            presenca.setHorarioDesembarque(LocalDateTime.now());
+            presenca.setHorarioDesembarque(DataBrasilia.agora());
         }
 
         presenca.setStatus(status);
         viagemPresencaRepository.save(presenca);
         registrarHistoricoViagemPresenca(presenca, anterior, status, atorUsuarioId, null, null, Instant.now());
         notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, status);
+        notificarProximaParada(atorUsuarioId, viagemDia);
 
         return gerarParadasViagemDia(idViagemDia);
     }
@@ -881,6 +946,7 @@ public class ViagemService {
                 presenca, atual, evento.statusNovo(), atorUsuarioId, evento.idEvento(),
                 evento.ocorridoEm(), Instant.now());
         notificarResponsaveisDaPresenca(atorUsuarioId, presenca, viagemDia, evento.statusNovo());
+        notificarProximaParada(atorUsuarioId, viagemDia);
 
         return resultadoOffline(evento, StatusEventoSincronizacao.APLICADO, evento.statusNovo(), null);
     }
@@ -1014,7 +1080,7 @@ public class ViagemService {
             throw new ConflictException("Só é possível avisar atraso em viagem planejada ou em andamento");
         }
         if (notificacaoRepository.existsByTipoAndViagemDiaIdAndDataAfter(
-                TipoNotificacao.ATRASO.name(), idViagemDia, LocalDateTime.now().minusMinutes(10))) {
+                TipoNotificacao.ATRASO.name(), idViagemDia, DataBrasilia.agora().minusMinutes(10))) {
             throw new ConflictException("Um aviso de atraso desta viagem foi enviado há menos de 10 minutos");
         }
         Set<Long> destinatarioIds = responsaveisDaExecucao(idViagemDia,
@@ -1038,7 +1104,7 @@ public class ViagemService {
         }
         Set<Long> destinatarioIds = new LinkedHashSet<>();
         for (Viagem viagem : viagemRepository.findAtivasByMotoristaId(motorista.getId())) {
-            viagemDiaRepository.findByViagemIdAndData(viagem.getId(), LocalDate.now())
+            viagemDiaRepository.findByViagemIdAndData(viagem.getId(), LocalDate.now(relogio))
                     .filter(vd -> vd.getStatus() == StatusViagemDia.PLANEJADA || vd.getStatus() == StatusViagemDia.EM_ANDAMENTO)
                     .ifPresent(vd -> destinatarioIds.addAll(responsaveisDaExecucao(vd.getId(), null)));
         }
@@ -1050,7 +1116,7 @@ public class ViagemService {
         notificacaoService.criarNotificacoesAutomaticas(motorista.getUsuario().getId(), destinatarioIds,
                 texto.titulo(), texto.mensagem(),
                 new NotificacaoService.Contexto(TipoNotificacao.TROCA_VEICULO, null, null,
-                        "veiculo:" + v.getId() + ":" + LocalDate.now() + ":" + v.getPlaca()));
+                        "veiculo:" + v.getId() + ":" + LocalDate.now(relogio) + ":" + v.getPlaca()));
     }
 
     private void registrarHistoricoViagemPresenca(
@@ -1068,7 +1134,7 @@ public class ViagemService {
         historico.setStatusAnterior(anterior);
         historico.setStatusNovo(novo);
         historico.setAtor(ator);
-        historico.setOcorridoEm(LocalDateTime.now());
+        historico.setOcorridoEm(DataBrasilia.agora());
         historico.setEventoClienteId(eventoClienteId);
         historico.setInstanteDispositivo(instanteDispositivo);
         historico.setRecebidoEm(recebidoEm);
@@ -1130,7 +1196,7 @@ public class ViagemService {
         }
 
         viagemDia.setStatus(status);
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         viagemDia.setDataUltimaAlteracaoStatus(agora);
         viagemDiaRepository.save(viagemDia);
         registrarHistoricoViagemDia(viagemDia, anterior, status, atorUsuarioId, motivoNormalizado);
@@ -1139,8 +1205,61 @@ public class ViagemService {
             localizacaoViagemAtualRepository.deleteByViagemDiaId(idViagemDia);
         }
         notificarResponsaveisDaExecucao(atorUsuarioId, viagemDia, status, motivoNormalizado);
+        if (status == StatusViagemDia.EM_ANDAMENTO) {
+            notificarProximaParada(atorUsuarioId, viagemDia);
+        }
 
         return viagemDia;
+    }
+
+    /**
+     * "Você é o próximo": avisa os responsáveis dos alunos da próxima parada de casa ainda pendente.
+     * Na ida a parada de casa é a busca (aluno ESPERANDO); na volta é a entrega (aluno EMBARCADO).
+     * Cada aluno recebe o aviso uma vez por execução (chave de deduplicação). Falhas aqui não desfazem a presença.
+     */
+    private void notificarProximaParada(Long atorUsuarioId, ViagemDia viagemDia) {
+        if (viagemDia == null || viagemDia.getId() == null || viagemDia.getStatus() != StatusViagemDia.EM_ANDAMENTO) {
+            return;
+        }
+        try {
+            Viagem viagem = viagemDia.getViagem();
+            boolean ida = viagem != null && isViagemIda(viagem.getPeriodo());
+            ParadaDTO proxima = proximaParadaPendente(gerarParadasViagemDia(viagemDia.getId()), ida);
+            if (proxima == null || proxima.tipoParada() != TipoParada.RESPONSAVEL) {
+                return;
+            }
+            String pendente = ida ? StatusViagemPresenca.ESPERANDO.name() : StatusViagemPresenca.EMBARCADO.name();
+            for (DependenteParadaDTO aluno : proxima.listaDependentes()) {
+                if (aluno.id() == null || !pendente.equals(aluno.statusEmbarque())) continue;
+                Set<Long> destinatarioIds = responsavelRepository.findUsuariosAtivosPorDependentes(List.of(aluno.id()))
+                        .stream()
+                        .map(DependenteResponsavelUsuarioProjection::getUsuarioId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                if (destinatarioIds.isEmpty()) continue;
+                MensagensNotificacao.Texto texto = MensagensNotificacao.proximo(aluno.nomeDependente(), viagem, ida);
+                notificacaoService.criarNotificacoesAutomaticas(
+                        atorUsuarioId, destinatarioIds, texto.titulo(), texto.mensagem(),
+                        new NotificacaoService.Contexto(TipoNotificacao.PROXIMO_ALUNO, viagemDia.getId(), aluno.id(),
+                                "proximo:" + viagemDia.getId() + ":" + aluno.id()));
+            }
+        } catch (RuntimeException e) {
+            // O aviso é complementar: não pode impedir o registro de presença nem o início da viagem.
+        }
+    }
+
+    /** Primeira parada (fora as do motorista) com aluno ainda pendente nela, na ordem atual da rota. */
+    static ParadaDTO proximaParadaPendente(List<ParadaDTO> paradas, boolean ida) {
+        if (paradas == null) return null;
+        for (ParadaDTO parada : paradas) {
+            if (parada.tipoParada() == TipoParada.MOTORISTA || parada.listaDependentes() == null) continue;
+            boolean embarqueAqui = (parada.tipoParada() == TipoParada.RESPONSAVEL) == ida;
+            String pendente = embarqueAqui ? StatusViagemPresenca.ESPERANDO.name() : StatusViagemPresenca.EMBARCADO.name();
+            if (parada.listaDependentes().stream().anyMatch(d -> pendente.equals(d.statusEmbarque()))) {
+                return parada;
+            }
+        }
+        return null;
     }
 
     private void validarAtorMotorista(Viagem viagem, Long atorUsuarioId) {
@@ -1163,7 +1282,7 @@ public class ViagemService {
         historico.setStatusAnterior(anterior);
         historico.setStatusNovo(novo);
         historico.setAtor(ator);
-        historico.setOcorridoEm(LocalDateTime.now());
+        historico.setOcorridoEm(DataBrasilia.agora());
         historico.setMotivo(motivo);
         historicoViagemDiaRepository.save(historico);
     }

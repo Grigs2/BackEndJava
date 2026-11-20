@@ -22,6 +22,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -56,6 +57,9 @@ public class SolicitacaoService {
 
     @Autowired
     private NotificacaoService notificacaoService;
+
+    @Autowired
+    private ViagemService viagemService;
 
     @Autowired
     private ResponsavelRepository responsavelRepository;
@@ -101,7 +105,7 @@ public class SolicitacaoService {
             throw new BusinessException("Dependente não possui responsáveis vinculados");
         }
 
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         solicitacao.setRespondido(false);
         solicitacao.setAceito(false);
         solicitacao.setStatus(StatusSolicitacao.PENDENTE);
@@ -161,7 +165,7 @@ public class SolicitacaoService {
         solicitacao.setAceito(false);
         solicitacao.setStatus(StatusSolicitacao.PENDENTE);
         solicitacao.setCompartilhamentoAutorizado(true);
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         solicitacao.setDataInicio(agora);
         solicitacao.setDataExpiracao(agora.plusDays(PRAZO_RESPOSTA_DIAS));
         solicitacao.setOrigem(OrigemSolicitacao.RESPONSAVEL);
@@ -278,12 +282,12 @@ public class SolicitacaoService {
 
     /** Marca como EXPIRADA as solicitações sem resposta cujo prazo de 3 dias já passou. */
     void expirarVencidas() {
-        solicitacaoRepository.expirarVencidas(LocalDateTime.now(), StatusSolicitacao.EXPIRADA);
+        solicitacaoRepository.expirarVencidas(DataBrasilia.agora(), StatusSolicitacao.EXPIRADA);
     }
 
     private void verificarPrazo(Solicitacao solicitacao) {
         if (solicitacao.getStatusEfetivo() == StatusSolicitacao.EXPIRADA
-                || solicitacao.isExpiradaEm(LocalDateTime.now())) {
+                || solicitacao.isExpiradaEm(DataBrasilia.agora())) {
             throw new BusinessException("Esta solicitação expirou. O prazo para resposta é de "
                     + PRAZO_RESPOSTA_DIAS + " dias");
         }
@@ -325,7 +329,7 @@ public class SolicitacaoService {
      * continuarem aparecendo como "Aceitar/Recusar".
      */
     private void encerrarDuplicadas(Solicitacao aceita) {
-        LocalDateTime agora = LocalDateTime.now();
+        LocalDateTime agora = DataBrasilia.agora();
         Long viagemId = aceita.getViagem().getId();
         for (Solicitacao outra : solicitacaoRepository.findPendentesByDependenteId(aceita.getDependente().getId())) {
             if (Objects.equals(outra.getId(), aceita.getId()) || outra.getViagem() == null
@@ -351,6 +355,8 @@ public class SolicitacaoService {
         vinculo.setDependente(solicitacao.getDependente());
         vinculo.setAtivo(true);
         viagemDependenteRepository.save(vinculo);
+        viagemService.incluirDependenteEmExecucoesPlanejadas(
+                solicitacao.getViagem().getId(), solicitacao.getDependente().getId());
     }
 
     private void validarAlunoParaViagem(Viagem viagem, Dependente dependente) {
@@ -373,12 +379,7 @@ public class SolicitacaoService {
         if (jaNaViagem) {
             throw new ConflictException("O aluno já faz parte desta viagem");
         }
-        Long motoristaId = viagem.getMotorista() != null ? viagem.getMotorista().getId() : null;
-        boolean vinculoAtivo = motoristaId != null && viagemEscolaRepository.existsByEscola_IdAndMotorista_IdAndStatusIn(
-                dependente.getEscola().getId(), motoristaId, List.of(StatusVinculoEscola.ATIVO));
-        if (!vinculoAtivo) {
-            throw new BusinessException("O motorista não tem vínculo ativo com a escola " + dependente.getEscola().getNome());
-        }
+        // O vínculo motorista + escola é opcional: serve de selo de confiança, não de requisito.
     }
 
     static String normalizar(String texto) {

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDate;
 
 @Service
@@ -25,7 +26,7 @@ public class DependenteService {
             throw new IllegalArgumentException("Dependente, ID, senha e usuário autenticado são obrigatórios");
         }
         if (dependente.getDataNascimento() != null
-                && dependente.getDataNascimento().isAfter(LocalDate.now())) {
+                && dependente.getDataNascimento().isAfter(DataBrasilia.hoje())) {
             throw new BusinessException("A data de nascimento do dependente não pode estar no futuro");
         }
         if (dependente.getCpf() != null && !dependente.getCpf().isBlank()) {

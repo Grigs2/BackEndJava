@@ -24,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import TioDaPerua.BackEndJava.entities.Solicitacao;
 import java.util.Map;
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Instant;
 import org.springframework.data.domain.Page;
 
@@ -43,6 +44,9 @@ public class ViagemController {
 
     @Autowired
     private SincronizacaoOfflineService sincronizacaoOfflineService;
+
+    @Autowired
+    private TioDaPerua.BackEndJava.services.RotaViagemService rotaViagemService;
 
     @Autowired
     private TioDaPerua.BackEndJava.services.HistoricoService historicoService;
@@ -81,10 +85,14 @@ public class ViagemController {
         return ResponseEntity.ok(viagens);
     }
 
+    /** Sem datas: hoje (Brasília) até +6 dias, 7 dias no total. Os limites de de/ate são inclusivos. */
     @GetMapping("/Agenda/{idMotorista}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
-    public ResponseEntity<List<AgendaViagemDTO>> agenda(@PathVariable Long idMotorista) {
-        return ResponseEntity.ok(viagemService.agendaMotorista(idMotorista));
+    public ResponseEntity<List<AgendaViagemDTO>> agenda(
+            @PathVariable Long idMotorista,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate de,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate ate) {
+        return ResponseEntity.ok(viagemService.agendaMotorista(idMotorista, de, ate));
     }
 
     @GetMapping("/Prontidao/{idViagem}")
@@ -114,7 +122,7 @@ public class ViagemController {
             return ResponseEntity.badRequest().build();
         }
         // Sem datas: último ano (antes devolvia tudo). Mais recentes primeiro.
-        java.time.LocalDate fim = ate == null ? java.time.LocalDate.now() : ate;
+        java.time.LocalDate fim = ate == null ? DataBrasilia.hoje() : ate;
         java.time.LocalDate inicio = de == null ? fim.minusDays(365) : de;
         return ResponseEntity.ok(historicoService.doMotorista(idMotorista, inicio, fim));
     }
@@ -325,6 +333,15 @@ public class ViagemController {
                 idDependente, Long.valueOf(jwt.getSubject()), dto.aceito()));
     }
 
+    @GetMapping("/Localizacao/Consentimento/Dependente/{idDependente}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p0)")
+    public ResponseEntity<ConsentimentoLocalizacaoDTO> consultarConsentimentoLocalizacaoDependente(
+            @PathVariable Long idDependente,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(localizacaoViagemService.consultarConsentimentoResponsavel(
+                idDependente, Long.valueOf(jwt.getSubject())));
+    }
+
     @GetMapping("/Localizacao/Consentimento/Execucao/{idViagemDia}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaExecucao(authentication, #p0)")
     public ResponseEntity<EstadoConsentimentoLocalizacaoDTO> estadoConsentimentoLocalizacao(
@@ -341,6 +358,21 @@ public class ViagemController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(localizacaoViagemService.registrarPosicao(
                 dto, Long.valueOf(jwt.getSubject())));
+    }
+
+    /**
+     * Rota e previsão de chegada da viagem em andamento. O motorista recebe a rota inteira (e pode mandar a
+     * posição do aparelho); o responsável recebe só o trecho até a parada do próprio aluno.
+     */
+    @GetMapping("/ViagemDia/{idViagemDia}/Rota")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.podeAcessarExecucao(authentication, #p0)")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.RotaViagemDTO> consultarRota(
+            @PathVariable Long idViagemDia,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(rotaViagemService.calcular(
+                idViagemDia, Long.valueOf(jwt.getSubject()), latitude, longitude));
     }
 
     @GetMapping("/Localizacao/Atual/{idViagemDia}")
