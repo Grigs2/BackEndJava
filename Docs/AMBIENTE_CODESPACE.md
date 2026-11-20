@@ -83,7 +83,7 @@ No terminal do codespace (`Terminal → New Terminal`), na pasta `/workspaces/Ba
 
 ```bash
 chmod +x mvnw
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dmaven.test.skip=true
 ```
 
 > O `chmod +x mvnw` é necessário porque o Windows não guarda a permissão de execução do `mvnw` no git. Sem ele aparece `Permission denied`. Basta rodar uma vez por codespace.
@@ -123,6 +123,22 @@ https://<nome-do-codespace>-8080.app.github.dev/TioDaPerua/api/Autenticacao/Entr
 Uma resposta de método não permitido (GET) ou de erro de login (sem corpo) já mostra que a API está no ar. Para testar de verdade, use o login pelo frontend.
 
 > A documentação Swagger só aparece se `DOCS_ENABLED` estiver `true` (no `docker-compose.yml` ela já vem `true` no codespace).
+
+### 4.4 Criar contas e dados de teste (sem cadastrar nada à mão)
+
+No terminal do codespace do backend, na raiz do repositório:
+
+```bash
+bash scripts/preparar-ambiente-teste.sh
+```
+
+O script sobe a API se ela ainda não estiver no ar e cria, pela própria API:
+- 3 escolas, 3 motoristas (com veículo, documentos aprovados e vínculo com a escola), 5 responsáveis e 9 alunos com endereço;
+- viagens de ida e volta, convites aceitos (e um pendente em BH);
+- consentimento de GPS;
+- viagens de hoje em estados diferentes: SP em andamento com GPS, RJ em andamento sem GPS e RJ tarde só preparada.
+
+As contas e a senha ficam em `scripts/seed-perfis-teste/credenciais.txt` (fora do git). O que testar com cada conta está em `scripts/seed-perfis-teste/README.md`. Use `--simular-gps` para a perua de SP se mover no mapa, ou `--so-perfis` para criar só as contas. Pode rodar de novo a qualquer momento: nada é duplicado.
 
 ---
 
@@ -181,7 +197,7 @@ git checkout <nome-da-branch>
 git pull
 ```
 
-Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` de novo; frontend: `Ctrl+C` e rode `npx expo start --web --port 8081` de novo). Se mudou dependência (`pom.xml` ou `package.json`), rode `./mvnw -q dependency:go-offline` ou `npm install` antes.
+Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run -Dmaven.test.skip=true` de novo; frontend: `Ctrl+C` e rode `npx expo start --web --port 8081` de novo). Se mudou dependência (`pom.xml` ou `package.json`), rode `./mvnw -q dependency:go-offline` ou `npm install` antes.
 
 - **Backend e frontend em branches diferentes:** tudo bem. Cada codespace tem sua própria branch. Só lembre que a URL da API no frontend aponta para o codespace do backend, não para uma branch.
 
@@ -200,7 +216,7 @@ Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` d
 ## 8. Dia a dia (resumo)
 
 1. Abra https://github.com/codespaces e ligue o codespace do **backend**.
-2. Terminal: `./mvnw spring-boot:run`.
+2. Terminal: `./mvnw spring-boot:run -Dmaven.test.skip=true`.
 3. PORTS: porta 8080 **Public**. Copie o endereço.
 4. Ligue o codespace do **frontend**. Confira/atualize `.env.local`.
 5. Terminal: `npx expo start --web --port 8081`.
@@ -215,6 +231,7 @@ Depois, reinicie o serviço (backend: `Ctrl+C` e rode `./mvnw spring-boot:run` d
 | Erro `defina o secret JWT_SECRET_BASE64 no Codespaces` ao criar/subir o backend | Secret não criado ou sem acesso ao repositório `BackEndJava` | Confira a seção 3 e reinicie o codespace (`Ctrl+Shift+P` → **Codespaces: Rebuild Container**) |
 | Frontend abre, mas login/chamadas falham no navegador com erro de CORS | Porta 8080 ou 8081 está **Private**, ou a URL em `.env.local` está errada | Deixe as duas portas **Public**. Confira o `.env.local` e reinicie o `expo start` |
 | Frontend não usa a URL nova | O Expo lê as variáveis só na inicialização | Pare o `expo start` (`Ctrl+C`) e rode de novo |
+| `spring-boot:run` falha em `testCompile` com centenas de `cannot find symbol` (`Usuario`, `Escola`, `package ...enums does not exist`) | A extensão Java do VS Code compila o projeto em `target/classes` ao abrir o codespace, ao mesmo tempo que o Maven, e apaga as classes no meio do build | Espere a barra de status da extensão Java terminar ("Java: Ready") e rode `./mvnw clean spring-boot:run -Dmaven.test.skip=true` |
 | `Port 8080 already in use` no backend | O `spring-boot:run` anterior ainda está rodando | Pare com `Ctrl+C` no terminal antigo, ou use `pkill -f spring-boot` |
 | Backend não conecta no banco | Container `db` parado ou ainda subindo | Rode o teste de porta da seção "Comandos úteis". Se falhar, use **Codespaces: Rebuild Container** |
 | Quer zerar o banco | Dados antigos no volume | Apague o codespace e crie outro da mesma branch. O volume `pgdata` é removido junto |

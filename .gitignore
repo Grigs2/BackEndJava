@@ -34,3 +34,7 @@ build/
 
 ### Credenciais de teste geradas pelo seed ###
 scripts/seed-perfis-teste/credenciais.txt
+
+# Python (scripts de seed)
+__pycache__/
+*.pyc

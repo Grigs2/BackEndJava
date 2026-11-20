@@ -1,5 +1,40 @@
 # Perfis de teste - Tio da Perua
 
+## Atalho: tudo de uma vez no Codespace
+
+Na raiz do repositorio do backend, com os secrets `JWT_SECRET_BASE64`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` configurados no Codespaces:
+
+```bash
+bash scripts/preparar-ambiente-teste.sh
+```
+
+O script sobe a API se ela ainda nao estiver no ar (log em `/tmp/tiodaperua-backend.log`), instala o Python 3 se faltar, cria os perfis (`seed_perfis.py`) e monta o cenario de uso (`seed_cenario.py`, secao "Cenario de uso" abaixo). Pode rodar de novo quando quiser: nada e duplicado.
+
+| Opcao | Efeito |
+|---|---|
+| `--simular-gps` | No fim, fica enviando a posicao da perua de SP a cada 15 s, movendo-a no mapa (Ctrl+C para parar). Sem isso, a posicao fica "desatualizada" no app depois de 45 s. |
+| `--so-perfis` | So cria as contas, sem viagens nem cenario. |
+
+Se a API ja estiver rodando em outro terminal, o script so roda as seeds. `GPS_CONSENT_VERSION` e `TERMS_VERSION` recebem `teste-codespace` quando nao estao definidas; se a API ja estava no ar sem `GPS_CONSENT_VERSION`, o cenario avisa e segue sem GPS.
+
+## Cenario de uso (`seed_cenario.py`)
+
+Roda sobre as contas abaixo e deixa o app pronto para testar:
+
+| Conta | O que encontrar |
+|---|---|
+| `motorista.sp@...` | Documentos aprovados, viagens Manha ida/volta. **Viagem de hoje (manha-ida) em andamento**, com posicao de GPS. |
+| `responsavel.sp1@...` (Lucas e Sofia) | Card destacado: a casa dos dois e a proxima parada depois da Ana. Mapa ao vivo no "Acompanhar". Parada "Embarque de Lucas, Sofia" no app do motorista. |
+| `responsavel.sp2@...` (Ana Clara) | Ana e a proxima parada da viagem: "PROXIMO EVENTO DA VIAGEM" e horario estimado. |
+| `motorista.rj@...` | Viagens Manha e Tarde (ida/volta). **Manha-ida em andamento com os 3 alunos embarcados e sem GPS**; tarde-ida so preparada. |
+| `responsavel.rj1@...` (Gabriel, Laura, Mateus) | Luz "No veiculo", proxima interacao "chegada na escola" e **mapa alternativo em linha de metro** (sem localizacao). |
+| `responsavel.rj2@...` (Sofia e Davi) | Viagem da tarde "Aguardando inicio". |
+| `motorista.bh@...` / `responsavel.bh1@...` (Miguel) | Convite de transporte **pendente** para aceitar ou recusar. |
+| Todos os responsaveis | Notificacoes nao lidas (viagem iniciada, embarques, convites) para o popout do sino. |
+| ADMIN (`ADMIN_EMAIL`) | Documentos ja revisados; auditoria com as aprovacoes. |
+
+As viagens de hoje usam a data do servidor. Em outro dia, rode o script de novo: ele prepara e inicia a viagem da nova data. Se a viagem de hoje ja tiver sido finalizada, ela e mantida como esta.
+
 Este diretorio recria, pela API, um conjunto de perfis de teste coerentes: cada escola, motorista, responsavel e dependente fica na mesma cidade.
 
 ## O que e criado
@@ -50,7 +85,7 @@ Credenciais (senha igual para todas, definida em `dados.json`). O seed grava a l
 4. Suba a aplicacao (em um terminal):
 
    ```bash
-   ./mvnw spring-boot:run
+   ./mvnw spring-boot:run -Dmaven.test.skip=true
    ```
 
    Ela responde em `http://localhost:8080/TioDaPerua/api`.
