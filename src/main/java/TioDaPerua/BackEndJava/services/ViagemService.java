@@ -20,6 +20,7 @@ import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,7 +117,8 @@ public class ViagemService {
                         data,
                         execucao == null ? null : execucao.getId(),
                         execucao == null ? null : execucao.getStatus(),
-                        execucao != null));
+                        execucao != null,
+                        HorarioPartida.formatar(HorarioPartida.resolver(viagem, execucao))));
             }
         }
         return agenda;
@@ -793,6 +795,9 @@ public class ViagemService {
             throw new ConflictException("Motorista já possui uma viagem ativa para este período: " + viagem.getPeriodo());
         }
 
+        if (viagem.getHorarioPartidaPadrao() == null && viagem.getPeriodo() != null) {
+            viagem.setHorarioPartidaPadrao(viagem.getPeriodo().horarioPartidaPadrao());
+        }
         viagem.setMotorista(motorista);
         return viagemRepository.save(viagem);
     }
@@ -804,6 +809,56 @@ public class ViagemService {
                 .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
         viagem.setNome(nome);
         return viagemRepository.save(viagem);
+    }
+
+    /**
+     * Altera o horário de partida padrão. Execuções que ainda não têm horário próprio e já não estão planejadas
+     * (ou são de datas passadas) recebem o horário anterior antes da troca, para que o histórico não mude.
+     */
+    @Transactional
+    public Viagem alterarHorarioPartidaPadrao(Long idViagem, LocalTime horario) {
+        if (idViagem == null || horario == null) {
+            throw new IllegalArgumentException("Viagem e horário de partida são obrigatórios");
+        }
+        Viagem viagem = viagemRepository.findByIdForUpdate(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
+        if (!Boolean.TRUE.equals(viagem.getAtivo())) {
+            throw new ConflictException("Não é possível alterar o horário de um itinerário desativado");
+        }
+
+        LocalTime anterior = HorarioPartida.resolver(viagem, null);
+        if (anterior != null && !anterior.equals(horario)) {
+            LocalDate hoje = LocalDate.now(relogio);
+            List<ViagemDia> congeladas = viagemDiaRepository
+                    .findSemHorarioProprioParaCongelar(idViagem, StatusViagemDia.PLANEJADA, hoje);
+            congeladas.forEach(dia -> dia.setHorarioPartida(anterior));
+            viagemDiaRepository.saveAll(congeladas);
+        }
+
+        viagem.setHorarioPartidaPadrao(horario);
+        return viagemRepository.save(viagem);
+    }
+
+    /**
+     * Altera o horário de partida de uma data dentro da janela de preparação. Horário nulo volta ao padrão.
+     * Se a execução ainda não existe, ela é preparada antes. Só é permitido enquanto estiver PLANEJADA.
+     */
+    @Transactional
+    public ViagemDia alterarHorarioPartidaDia(Long idViagem, LocalDate data, LocalTime horario, Long atorUsuarioId) {
+        if (idViagem == null || data == null || atorUsuarioId == null) {
+            throw new IllegalArgumentException("Viagem, data e usuário responsável pela alteração são obrigatórios");
+        }
+        LocalDate hoje = LocalDate.now(relogio);
+        if (data.isBefore(hoje) || data.isAfter(hoje.plusDays(6))) {
+            throw new BusinessException("A alteração do horário deve ocorrer entre hoje e os próximos 6 dias");
+        }
+
+        ViagemDia viagemDia = prepararViagemDia(idViagem, data, atorUsuarioId);
+        if (viagemDia.getStatus() != StatusViagemDia.PLANEJADA) {
+            throw new ConflictException("O horário de partida só pode ser alterado enquanto a execução estiver planejada");
+        }
+        viagemDia.setHorarioPartida(horario);
+        return viagemDiaRepository.save(viagemDia);
     }
 
     @Transactional
@@ -1010,7 +1065,7 @@ public class ViagemService {
         TipoNotificacao tipo;
         switch (status) {
             case EM_ANDAMENTO -> {
-                texto = MensagensNotificacao.aCaminho(viagem);
+                texto = MensagensNotificacao.aCaminho(viagem, HorarioPartida.resolver(viagem, viagemDia));
                 tipo = TipoNotificacao.MOTORISTA_A_CAMINHO;
             }
             case FINALIZADA -> {

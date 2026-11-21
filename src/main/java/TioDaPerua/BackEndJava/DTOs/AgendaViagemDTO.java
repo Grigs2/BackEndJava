@@ -11,5 +11,6 @@ public record AgendaViagemDTO(
         LocalDate data,
         Long idViagemDia,
         StatusViagemDia status,
-        boolean materializada) {
+        boolean materializada,
+        String horarioPartida) {
 }

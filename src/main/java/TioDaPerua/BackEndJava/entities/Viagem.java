@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,10 @@ public class Viagem implements Serializable {
     @Enumerated(EnumType.STRING)
     @Column(name = "periodo")
     private Periodo periodo;
+
+    /** Horário de partida padrão do itinerário; as execuções herdam este valor quando não têm horário próprio. */
+    @Column(name = "horario_partida_padrao")
+    private LocalTime horarioPartidaPadrao;
 
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;

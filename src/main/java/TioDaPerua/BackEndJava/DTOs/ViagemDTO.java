@@ -3,6 +3,7 @@ package TioDaPerua.BackEndJava.DTOs;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
 
@@ -15,7 +16,8 @@ public record ViagemDTO(Long id,
                        @NotBlank String periodo,
                        Boolean ativo,
                        List<EscolaResumoDTO> escolas,
-                       String nome) {
+                       String nome,
+                       @Pattern(regexp = HorarioPartida.REGEX, message = HorarioPartida.MENSAGEM) String horarioPartida) {
 
     public static ViagemDTO toDTO(Viagem viagem) {
         if (viagem == null) return null;
@@ -25,7 +27,8 @@ public record ViagemDTO(Long id,
                 viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
                 viagem.getAtivo(),
                 viagem.getEscolas().stream().map(e -> new EscolaResumoDTO(e.getId(), e.getNome())).toList(),
-                viagem.getNome()
+                viagem.getNome(),
+                HorarioPartida.formatar(viagem.getHorarioPartidaPadrao())
         );
     }
 
@@ -40,6 +43,7 @@ public record ViagemDTO(Long id,
             viagem.setAtivo(dto.ativo());
         }
         viagem.setNome(dto.nome());
+        viagem.setHorarioPartidaPadrao(HorarioPartida.converter(dto.horarioPartida()));
         return viagem;
     }
 }

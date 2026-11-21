@@ -21,6 +21,14 @@ public interface ViagemDiaRepository extends JpaRepository<ViagemDia, Long> {
     @Query("""
         SELECT vd FROM ViagemDia vd
         WHERE vd.viagem.id = :viagemId
+        AND vd.horarioPartida IS NULL
+        AND (vd.status IS NULL OR vd.status <> :planejada OR vd.data < :hoje)
+    """)
+    List<ViagemDia> findSemHorarioProprioParaCongelar(Long viagemId, StatusViagemDia planejada, LocalDate hoje);
+
+    @Query("""
+        SELECT vd FROM ViagemDia vd
+        WHERE vd.viagem.id = :viagemId
         AND vd.status = :status
         AND vd.data >= :data
         ORDER BY vd.data ASC
