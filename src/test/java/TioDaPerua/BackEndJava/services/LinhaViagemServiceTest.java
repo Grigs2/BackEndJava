@@ -37,7 +37,7 @@ class LinhaViagemServiceTest {
         assertEquals("EMBARQUE", linha.paradas().get(0).acao());
         assertNull(linha.paradas().get(0).rotulo());
         assertTrue(linha.paradas().get(1).doFilho());
-        assertEquals("Casa do Enzo", linha.paradas().get(1).rotulo());
+        assertEquals("Casa de Enzo", linha.paradas().get(1).rotulo());
         assertEquals("Colégio X", linha.paradas().get(2).rotulo());
         assertEquals("DESEMBARQUE", linha.paradas().get(2).acao());
         assertFalse(linha.paradas().get(2).doFilho());

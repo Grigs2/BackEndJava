@@ -22,7 +22,7 @@ GET /Viagem/ViagemDia/{viagemDiaId}/Linha?dependenteId={id}
   "indiceAtual": 2,
   "paradas": [
     { "ordem": 1, "tipoParada": "RESPONSAVEL", "acao": "EMBARQUE", "concluida": true, "doFilho": false, "rotulo": null },
-    { "ordem": 2, "tipoParada": "RESPONSAVEL", "acao": "EMBARQUE", "concluida": false, "doFilho": true, "rotulo": "Casa do Enzo" },
+    { "ordem": 2, "tipoParada": "RESPONSAVEL", "acao": "EMBARQUE", "concluida": false, "doFilho": true, "rotulo": "Casa de Enzo" },
     { "ordem": 3, "tipoParada": "ESCOLA", "acao": "DESEMBARQUE", "concluida": false, "doFilho": false, "rotulo": "Colégio X" }
   ]
 }
@@ -45,7 +45,7 @@ GET /Viagem/ViagemDia/{viagemDiaId}/Linha?dependenteId={id}
 
 - `rotulo` é preenchido só em dois casos:
   - `tipoParada = ESCOLA`: nome da escola.
-  - `doFilho = true`: `Casa do {primeiroNome}` do aluno consultado.
+  - `doFilho = true`: `Casa de {primeiroNome}` do aluno consultado.
 - Nas demais paradas, `rotulo` é `null`. O front mostra "Parada N".
 - Endereço nunca entra nesta resposta, nem para a parada do aluno.
 - Coordenadas também não entram. A posição da perua continua vindo de `GET /Viagem/Localizacao/Atual/{viagemDiaId}`.

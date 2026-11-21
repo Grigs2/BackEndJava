@@ -101,7 +101,7 @@ public class LinhaViagemService {
         if (!doFilho) {
             return null;
         }
-        return "Casa do " + primeiroNome(nomeAluno);
+        return "Casa de " + primeiroNome(nomeAluno);
     }
 
     private static String primeiroNome(String nome) {
