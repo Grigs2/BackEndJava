@@ -25,12 +25,21 @@ public class CorrecaoEsquemaBanco implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(CorrecaoEsquemaBanco.class);
 
     /** Restrições CHECK de colunas de enum que precisam aceitar valores novos. */
+    /** Padrões por turno aplicados às viagens já existentes. Só preenche valores nulos; execuções não são alteradas. */
     static final List<String> COMANDOS = List.of(
             "ALTER TABLE IF EXISTS public.viagem DROP CONSTRAINT IF EXISTS viagem_periodo_check",
             // INTERROMPIDA entrou depois em StatusViagemDia; o CHECK antigo recusava o valor.
             "ALTER TABLE IF EXISTS public.viagem_dia DROP CONSTRAINT IF EXISTS viagem_dia_status_check",
             "ALTER TABLE IF EXISTS public.historico_viagem_dia DROP CONSTRAINT IF EXISTS historico_viagem_dia_status_anterior_check",
-            "ALTER TABLE IF EXISTS public.historico_viagem_dia DROP CONSTRAINT IF EXISTS historico_viagem_dia_status_novo_check"
+            "ALTER TABLE IF EXISTS public.historico_viagem_dia DROP CONSTRAINT IF EXISTS historico_viagem_dia_status_novo_check",
+            """
+            UPDATE public.viagem SET horario_partida_padrao = CASE periodo
+                WHEN 'MANHA_IDA' THEN TIME '07:00' WHEN 'MANHA_VOLTA' THEN TIME '07:00'
+                WHEN 'TARDE_IDA' THEN TIME '12:00' WHEN 'TARDE_VOLTA' THEN TIME '12:00'
+                WHEN 'NOITE_IDA' THEN TIME '17:00' WHEN 'NOITE_VOLTA' THEN TIME '17:00'
+            END
+            WHERE horario_partida_padrao IS NULL
+            """
     );
 
     private final JdbcTemplate jdbcTemplate;

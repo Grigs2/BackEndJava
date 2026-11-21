@@ -6,6 +6,7 @@ import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.enums.Periodo;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -78,10 +79,12 @@ public final class MensagensNotificacao {
                         + " de hoje. Se for engano, fale com o motorista.");
     }
 
-    public static Texto aCaminho(Viagem v) {
+    /** Início da execução: informa o horário de partida previsto, quando houver. */
+    public static Texto aCaminho(Viagem v, LocalTime partida) {
         Motorista m = v == null ? null : v.getMotorista();
+        String previsao = partida == null ? "" : " Partida prevista às " + partida.format(HORA) + ".";
         return new Texto("A caminho",
-                primeiroNome(m == null ? null : m.getNome(), "O motorista") + " saiu para a " + viagem(v) + ".");
+                primeiroNome(m == null ? null : m.getNome(), "O motorista") + " saiu para a " + viagem(v) + "." + previsao);
     }
 
     /** Aviso de que o aluno é o próximo da rota: na ida, a próxima busca; na volta, a próxima entrega. */

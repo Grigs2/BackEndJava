@@ -1,6 +1,7 @@
 package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.DTOs.HistoricoAlunoDTO;
+import TioDaPerua.BackEndJava.DTOs.HorarioPartida;
 import TioDaPerua.BackEndJava.DTOs.ViagemDiaResumoDTO;
 import TioDaPerua.BackEndJava.entities.HistoricoViagemDia;
 import TioDaPerua.BackEndJava.entities.Motorista;
@@ -89,7 +90,8 @@ public class HistoricoService {
                 (int) presencas.stream().filter(p -> p.getStatus() == StatusViagemPresenca.FALTOU).count(),
                 e.inicio(),
                 e.fim(),
-                e.motivo());
+                e.motivo(),
+                HorarioPartida.formatar(HorarioPartida.resolver(viagem, dia)));
     }
 
     private record Encerramento(LocalDateTime inicio, LocalDateTime fim, String motivo) {

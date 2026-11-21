@@ -311,6 +311,8 @@ Consultas e alterações administrativas são auditadas com ator, ação, alvo, 
 | Solicitar Dependente | `POST /Viagem/SolicitarDependente/{v}/{d}` | ViagemController |
 | Iniciar Viagem Diária | `POST /Viagem/IniciarViagemDia/{id}` | ViagemController |
 | Preparar execução em data escolhida | `POST /Viagem/PrepararViagemDia/{id}` | ViagemController |
+| Alterar horário de partida padrão | `PUT /Viagem/AlterarHorarioPartida/{id}` com `{"horarioPartida":"07:00"}` (HH:mm). Execuções ainda não iniciadas e sem horário próprio, e as passadas, mantêm o horário anterior | ViagemController |
+| Alterar horário de partida de uma data (janela de 7 dias) | `PUT /Viagem/AlterarHorarioPartidaDia/{id}` com `{"data":"yyyy-MM-dd","horarioPartida":"07:30"}`; `null` volta ao padrão. Só enquanto a execução estiver PLANEJADA | ViagemController |
 | Alterar Status ViagemDia | `PUT /Viagem/AlterarStatusViagemDia` | ViagemController |
 | Alterar Status Presença | `PUT /Viagem/AlterarStatusPresenca` | ViagemController |
 | Histórico de Presença da ViagemDia | `GET /Viagem/HistoricoPresenca/{idViagemDia}` | ViagemController |

@@ -10,6 +10,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @Entity
@@ -41,5 +42,9 @@ public class ViagemDia implements Serializable {
 
     @Column(name = "data_ultima_alteracao_status")
     private LocalDateTime dataUltimaAlteracaoStatus;
+
+    /** Horário de partida próprio da execução; nulo significa usar o horário padrão da viagem. */
+    @Column(name = "horario_partida")
+    private LocalTime horarioPartida;
 
 }

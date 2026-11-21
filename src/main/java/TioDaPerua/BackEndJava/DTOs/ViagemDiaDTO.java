@@ -10,7 +10,9 @@ public record   ViagemDiaDTO(
     String status,
     LocalDateTime dataUltimaAlteracaoStatus,
     Long viagemId,
-    String periodo
+    String periodo,
+    String horarioPartida,
+    boolean horarioPartidaPersonalizado
 ) {
     public static ViagemDiaDTO toDTO(ViagemDia entity) {
         if (entity == null) return null;
@@ -21,7 +23,9 @@ public record   ViagemDiaDTO(
             entity.getStatus() != null ? entity.getStatus().name() : null,
             entity.getDataUltimaAlteracaoStatus(),
             viagem != null ? viagem.getId() : null,
-            viagem != null && viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null
+            viagem != null && viagem.getPeriodo() != null ? viagem.getPeriodo().name() : null,
+            HorarioPartida.formatar(HorarioPartida.resolver(viagem, entity)),
+            entity.getHorarioPartida() != null
         );
     }
 }

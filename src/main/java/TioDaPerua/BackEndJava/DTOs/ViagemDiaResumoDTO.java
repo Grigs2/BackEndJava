@@ -20,5 +20,6 @@ public record ViagemDiaResumoDTO(Long id,
                                  int faltas,
                                  LocalDateTime inicio,
                                  LocalDateTime fim,
-                                 String motivo) {
+                                 String motivo,
+                                 String horarioPartida) {
 }

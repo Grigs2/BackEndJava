@@ -73,6 +73,28 @@ public class ViagemController {
         return ResponseEntity.ok(ViagemDTO.toDTO(viagemService.atualizarNome(idViagem, dto.nome())));
     }
 
+    @PutMapping("/AlterarHorarioPartida/{idViagem}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
+    public ResponseEntity<ViagemDTO> AlterarHorarioPartida(@PathVariable Long idViagem,
+                                                           @Valid @RequestBody AlterarHorarioPartidaDTO dto) {
+        if (idViagem == null || dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ViagemDTO.toDTO(viagemService.alterarHorarioPartidaPadrao(idViagem, dto.horario())));
+    }
+
+    @PutMapping("/AlterarHorarioPartidaDia/{idViagem}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
+    public ResponseEntity<ViagemDiaDTO> AlterarHorarioPartidaDia(@PathVariable Long idViagem,
+                                                                 @Valid @RequestBody AlterarHorarioPartidaDiaDTO dto,
+                                                                 @AuthenticationPrincipal Jwt jwt) {
+        if (idViagem == null || dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ViagemDiaDTO.toDTO(viagemService.alterarHorarioPartidaDia(
+                idViagem, dto.data(), dto.horario(), jwt == null ? null : Long.valueOf(jwt.getSubject()))));
+    }
+
     @GetMapping("/ListarViagens/{idMotorista}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
     public ResponseEntity<List<ViagemDTO>> ListarViagens(@PathVariable Long idMotorista) {
