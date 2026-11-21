@@ -319,6 +319,23 @@ public class LocalizacaoViagemService {
     }
 
     /**
+     * Linha do aluno: exige acesso à execução, GPS ativo e consentimento do responsável para este aluno específico.
+     */
+    @Transactional(readOnly = true)
+    public void validarLeituraLocalizacaoDoDependente(Long viagemDiaId, Long usuarioId, Long dependenteId) {
+        ViagemDia execucao = validarAcessoLeitura(viagemDiaId, usuarioId);
+        exigirGpsAtivo(viagemDiaId, usuarioDono(execucao));
+        boolean autorizou = consentimentoRepository.findLatestByDependentesAndUsuarios(
+                        TipoEscopoConsentimentoLocalizacao.DEPENDENTE, List.of(dependenteId), Set.of(usuarioId),
+                        versaoPoliticaAtual())
+                .stream()
+                .anyMatch(this::estaAceito);
+        if (!autorizou) {
+            throw new ConflictException("Autorize o compartilhamento da localização para acompanhar o veículo no mapa");
+        }
+    }
+
+    /**
      * O responsável só vê o mapa depois de autorizar para ao menos um dos seus alunos nesta viagem.
      * A mensagem começa com "Autorize" para o app oferecer o botão de permitir.
      */

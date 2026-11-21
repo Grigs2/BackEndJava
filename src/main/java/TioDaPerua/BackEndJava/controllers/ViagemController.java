@@ -49,6 +49,9 @@ public class ViagemController {
     private TioDaPerua.BackEndJava.services.RotaViagemService rotaViagemService;
 
     @Autowired
+    private TioDaPerua.BackEndJava.services.LinhaViagemService linhaViagemService;
+
+    @Autowired
     private TioDaPerua.BackEndJava.services.HistoricoService historicoService;
 
     @PostMapping("/CriarViagem/{id_motorista}")
@@ -395,6 +398,19 @@ public class ViagemController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(rotaViagemService.calcular(
                 idViagemDia, Long.valueOf(jwt.getSubject()), latitude, longitude));
+    }
+
+    /**
+     * Linha de paradas para o responsável acompanhar o próprio aluno. Sem endereços nem coordenadas.
+     */
+    @GetMapping("/ViagemDia/{idViagemDia}/Linha")
+    @PreAuthorize("#p0 != null && #p1 != null && @resourceAuthorization.isResponsavelDoDependente(authentication, #p1)")
+    public ResponseEntity<TioDaPerua.BackEndJava.DTOs.LinhaViagemDTO> consultarLinha(
+            @PathVariable Long idViagemDia,
+            @RequestParam Long dependenteId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(linhaViagemService.consultar(
+                idViagemDia, dependenteId, Long.valueOf(jwt.getSubject())));
     }
 
     @GetMapping("/Localizacao/Atual/{idViagemDia}")
