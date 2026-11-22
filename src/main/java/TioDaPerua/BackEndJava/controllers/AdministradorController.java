@@ -64,6 +64,16 @@ public class AdministradorController {
         return ResponseEntity.ok(documentos);
     }
 
+    /** Fila de revisão com o motorista, o veículo e as conferências automáticas de cada documento. */
+    @GetMapping("/Documentos/Revisao")
+    public ResponseEntity<List<TioDaPerua.BackEndJava.DTOs.DocumentoRevisaoDTO>> listarDocumentosParaRevisao(
+            @AuthenticationPrincipal Jwt jwt) {
+        List<TioDaPerua.BackEndJava.DTOs.DocumentoRevisaoDTO> documentos = documentoMotoristaService.listarParaRevisao();
+        auditoriaService.registrarConsulta(
+                Long.valueOf(jwt.getSubject()), "DOCUMENTOS_PENDENTES_CONSULTADOS", "DOCUMENTO_MOTORISTA");
+        return ResponseEntity.ok(documentos);
+    }
+
     @PutMapping("/Documentos/{idDocumento}/Revisar")
     public ResponseEntity<DocumentoMotoristaDTO> revisarDocumento(
             @PathVariable Long idDocumento,
