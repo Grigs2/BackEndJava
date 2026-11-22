@@ -97,6 +97,14 @@ public class DocumentoMotoristaService {
                 .toList();
     }
 
+    /** Fila de revisão com motorista, veículo e conferências automáticas (mais antigos primeiro). */
+    @Transactional(readOnly = true)
+    public List<TioDaPerua.BackEndJava.DTOs.DocumentoRevisaoDTO> listarParaRevisao() {
+        return documentoRepository.findByStatusAndSubstituidoEmIsNullOrderBySubmetidoEmAsc(StatusDocumento.PENDENTE).stream()
+                .map(ConferenciaDocumentoService::paraRevisao)
+                .toList();
+    }
+
     @Transactional
     public DocumentoMotoristaDTO revisar(Long administradorUsuarioId, Long documentoId, RevisarDocumentoDTO dto) {
         if (administradorUsuarioId == null || documentoId == null || dto == null || dto.status() == null) {

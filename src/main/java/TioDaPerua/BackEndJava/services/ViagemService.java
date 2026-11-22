@@ -281,7 +281,8 @@ public class ViagemService {
                 motorista.getUsuario() != null ? motorista.getUsuario().getTelefone() : null,
                 veiculo != null ? veiculo.getModelo() : null,
                 veiculo != null ? veiculo.getPlaca() : null,
-                veiculo != null ? veiculo.getCor() : "N/A"
+                veiculo != null ? veiculo.getCor() : "N/A",
+                motorista.getUsuario() != null ? motorista.getUsuario().getId() : null
         );
     }
 
@@ -652,36 +653,156 @@ public class ViagemService {
             }
         }
 
+        // Cada aluno precisa embarcar antes de desembarcar. Desembarque na escola adiantado para antes de alguns
+        // embarques vira um desembarque extra nessa escola, no fim da rota (antes da casa do motorista).
+        List<ViagemParada> sequencia = new ArrayList<>(idsParadas.stream().map(paradasPorId::get).toList());
+        List<ViagemParada> criadas = separarDesembarquesAntecipados(sequencia);
+
         List<HistoricoOrdemParada> historicos = new ArrayList<>();
         Usuario ator = usuarioRepository.findById(atorUsuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado"));
         LocalDateTime agora = DataBrasilia.agora();
-        int deslocamento = paradasAtuais.size();
-        for (int indice = 0; indice < idsParadas.size(); indice++) {
-            ViagemParada parada = paradasPorId.get(idsParadas.get(indice));
+        Map<Long, Integer> ordemAnterior = paradasAtuais.stream()
+                .collect(Collectors.toMap(ViagemParada::getId, ViagemParada::getOrdem));
+        // Duas etapas por causa da restrição única (viagem_dia_id, ordem): primeiro todas para ordens livres.
+        int deslocamento = sequencia.size() + paradasAtuais.size();
+        for (int indice = 0; indice < sequencia.size(); indice++) {
+            sequencia.get(indice).setOrdem(indice + 1 + deslocamento);
+        }
+        viagemParadaRepository.saveAll(sequencia);
+        viagemParadaRepository.flush();
+
+        for (int indice = 0; indice < sequencia.size(); indice++) {
+            ViagemParada parada = sequencia.get(indice);
             int novaOrdem = indice + 1;
-            if (parada.getOrdem() != novaOrdem) {
+            parada.setOrdem(novaOrdem);
+            Integer anterior = parada.getId() == null ? null : ordemAnterior.get(parada.getId());
+            boolean nova = criadas.contains(parada);
+            if (nova || (anterior != null && anterior != novaOrdem)) {
                 HistoricoOrdemParada historico = new HistoricoOrdemParada();
                 historico.setViagemDia(viagemDia);
                 historico.setParada(parada);
-                historico.setOrdemAnterior(parada.getOrdem());
+                // 0 = parada criada nesta alteração (desembarque extra na escola).
+                historico.setOrdemAnterior(nova ? 0 : anterior);
                 historico.setOrdemNova(novaOrdem);
                 historico.setAtor(ator);
                 historico.setOcorridoEm(agora);
                 historicos.add(historico);
             }
-            parada.setOrdem(parada.getOrdem() + deslocamento);
         }
-        viagemParadaRepository.saveAll(paradasAtuais);
-        viagemParadaRepository.flush();
-
-        for (int indice = 0; indice < idsParadas.size(); indice++) {
-            paradasPorId.get(idsParadas.get(indice)).setOrdem(indice + 1);
-        }
-        viagemParadaRepository.saveAll(paradasAtuais);
+        viagemParadaRepository.saveAll(sequencia);
         viagemParadaRepository.flush();
         historicoOrdemParadaRepository.saveAll(historicos);
         return mapearParadas(viagemParadaRepository.listarPorViagemDia(idViagemDia));
+    }
+
+    /**
+     * Garante que cada aluno embarque antes de desembarcar, na sequência pedida pelo motorista.
+     *
+     * - Desembarque na ESCOLA colocado antes do embarque de parte dos alunos dela: esses alunos passam para um
+     *   desembarque extra na mesma escola, depois do último embarque deles (reaproveita um desembarque dessa escola
+     *   que já esteja depois; senão cria um novo antes da casa do motorista).
+     * - Desembarque na escola antes do embarque de TODOS os alunos dela, ou desembarque em casa antes do embarque
+     *   na escola (volta): recusado.
+     *
+     * Alunos que faltaram ou já desembarcaram não contam. Altera a lista e devolve as paradas criadas.
+     */
+    static List<ViagemParada> separarDesembarquesAntecipados(List<ViagemParada> sequencia) {
+        Map<Long, Integer> posicaoEmbarque = new HashMap<>();
+        for (int i = 0; i < sequencia.size(); i++) {
+            ViagemParada parada = sequencia.get(i);
+            if (parada.getOperacao() != TipoOperacaoParada.EMBARQUE) continue;
+            for (ViagemParadaParticipante participante : parada.getParticipantes()) {
+                posicaoEmbarque.put(chaveAluno(participante), i);
+            }
+        }
+
+        List<ViagemParada> criadas = new ArrayList<>();
+        for (int i = 0; i < sequencia.size(); i++) {
+            ViagemParada parada = sequencia.get(i);
+            if (parada.getOperacao() != TipoOperacaoParada.DESEMBARQUE) continue;
+            final int posicao = i;
+            List<ViagemParadaParticipante> antecipados = parada.getParticipantes().stream()
+                    .filter(ViagemService::aindaVaiDesembarcar)
+                    .filter(p -> {
+                        Integer embarque = posicaoEmbarque.get(chaveAluno(p));
+                        return embarque != null && embarque > posicao;
+                    })
+                    .toList();
+            if (antecipados.isEmpty()) continue;
+
+            String nomes = antecipados.stream()
+                    .map(p -> primeiroNome(p.getNomeDependenteSnapshot()))
+                    .collect(Collectors.joining(", "));
+            if (parada.getTipoParada() != TipoParada.ESCOLA) {
+                throw new BusinessException("O desembarque de " + nomes
+                        + " não pode vir antes do embarque na escola");
+            }
+            long restantes = parada.getParticipantes().stream().filter(ViagemService::aindaVaiDesembarcar).count()
+                    - antecipados.size();
+            if (restantes <= 0) {
+                throw new BusinessException("O desembarque em " + nomeLocalSemPrefixo(parada)
+                        + " precisa vir depois do embarque de pelo menos um aluno dessa escola");
+            }
+
+            int ultimoEmbarque = antecipados.stream()
+                    .mapToInt(p -> posicaoEmbarque.get(chaveAluno(p)))
+                    .max()
+                    .orElse(posicao);
+            ViagemParada destino = null;
+            for (int k = ultimoEmbarque + 1; k < sequencia.size(); k++) {
+                ViagemParada candidata = sequencia.get(k);
+                if (candidata != parada && candidata.getOperacao() == TipoOperacaoParada.DESEMBARQUE
+                        && candidata.getTipoParada() == TipoParada.ESCOLA
+                        && Objects.equals(candidata.getEndereco(), parada.getEndereco())) {
+                    destino = candidata;
+                    break;
+                }
+            }
+            if (destino == null) {
+                destino = new ViagemParada();
+                destino.setViagemDia(parada.getViagemDia());
+                destino.setTipoParada(parada.getTipoParada());
+                destino.setOperacao(parada.getOperacao());
+                destino.setNomeLocal(parada.getNomeLocal());
+                destino.setEndereco(parada.getEndereco());
+                destino.setStatusValidacaoEndereco(parada.getStatusValidacaoEndereco());
+                int fim = sequencia.isEmpty() || sequencia.get(sequencia.size() - 1).getTipoParada() != TipoParada.MOTORISTA
+                        ? sequencia.size() : sequencia.size() - 1;
+                sequencia.add(fim, destino);
+                criadas.add(destino);
+            }
+            for (ViagemParadaParticipante antecipado : antecipados) {
+                ViagemParadaParticipante copia = new ViagemParadaParticipante();
+                copia.setParada(destino);
+                copia.setPresenca(antecipado.getPresenca());
+                copia.setDependenteIdSnapshot(antecipado.getDependenteIdSnapshot());
+                copia.setNomeDependenteSnapshot(antecipado.getNomeDependenteSnapshot());
+                copia.setNomeResponsavelSnapshot(antecipado.getNomeResponsavelSnapshot());
+                destino.getParticipantes().add(copia);
+                parada.getParticipantes().remove(antecipado);
+            }
+        }
+        return criadas;
+    }
+
+    private static Long chaveAluno(ViagemParadaParticipante participante) {
+        if (participante.getDependenteIdSnapshot() != null) return participante.getDependenteIdSnapshot();
+        return participante.getPresenca() == null ? null : participante.getPresenca().getId();
+    }
+
+    private static boolean aindaVaiDesembarcar(ViagemParadaParticipante participante) {
+        StatusViagemPresenca status = participante.getPresenca() == null ? null : participante.getPresenca().getStatus();
+        return status != StatusViagemPresenca.FALTOU && status != StatusViagemPresenca.DESEMBARCADO;
+    }
+
+    private static String primeiroNome(String nome) {
+        return nome == null || nome.isBlank() ? "aluno" : nome.trim().split("\\s+")[0];
+    }
+
+    private static String nomeLocalSemPrefixo(ViagemParada parada) {
+        String nome = parada.getNomeLocal() == null ? "escola" : parada.getNomeLocal();
+        return nome.replaceFirst("^(Escola|Desembarque|Embarque)[^:]*:\\s*", "");
     }
 
     private boolean paradaConcluida(ViagemParada parada) {
