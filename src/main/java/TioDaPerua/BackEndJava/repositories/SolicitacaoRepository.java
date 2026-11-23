@@ -29,6 +29,15 @@ public interface SolicitacaoRepository extends JpaRepository<Solicitacao, Long> 
     """)
     List<Solicitacao> findAbertasByMotoristaId(Long motoristaId);
 
+    /** Solicitações ainda sem resposta de alunos de uma escola em uma viagem. */
+    @Query("""
+        SELECT s FROM Solicitacao s
+        WHERE s.viagem.id = :viagemId
+        AND s.dependente.escola.id = :escolaId
+        AND s.respondido = false
+    """)
+    List<Solicitacao> findAbertasPorViagemEEscola(Long viagemId, Long escolaId);
+
     @Query("""
         SELECT DISTINCT s
         FROM Solicitacao s

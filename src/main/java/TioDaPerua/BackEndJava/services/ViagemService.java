@@ -326,11 +326,34 @@ public class ViagemService {
                 continue;
             }
             viagem.getEscolas().removeIf(e -> escolaId.equals(e.getId()));
+            cancelarSolicitacoesAbertasDaEscola(viagem.getId(), escolaId, ator);
             removerAlunosDaEscolaNasExecucoesPlanejadas(viagem.getId(), escolaId, hoje, ator);
             if (viagem.getEscolas().isEmpty()) {
                 desativarViagem(viagem.getId());
             } else {
                 viagemRepository.save(viagem);
+            }
+        }
+    }
+
+    /** Pedidos abertos de alunos da escola removida são recusados e os responsáveis avisados. */
+    private void cancelarSolicitacoesAbertasDaEscola(Long idViagem, Long escolaId, Usuario ator) {
+        for (Solicitacao solicitacao : solicitacaoRepository.findAbertasPorViagemEEscola(idViagem, escolaId)) {
+            solicitacao.setRespondido(true);
+            solicitacao.setAceito(false);
+            solicitacao.setStatus(StatusSolicitacao.RECUSADA);
+            solicitacaoRepository.save(solicitacao);
+            Responsavel responsavel = solicitacao.getResponsavel();
+            if (responsavel != null && responsavel.getUsuario() != null && ator != null) {
+                notificacaoService.criarNotificacoesAutomaticas(
+                        ator.getId(),
+                        List.of(responsavel.getUsuario().getId()),
+                        "Pedido de vaga cancelado",
+                        "A escola deixou de atender esta viagem e o pedido de vaga para "
+                                + solicitacao.getDependente().getNome() + " foi cancelado.",
+                        new NotificacaoService.Contexto(TipoNotificacao.SOLICITACAO, null,
+                                solicitacao.getDependente().getId(),
+                                "solicitacao-cancelada:" + solicitacao.getId()));
             }
         }
     }

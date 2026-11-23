@@ -10,7 +10,10 @@ import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.HistoricoOrdemParada;
 import TioDaPerua.BackEndJava.entities.Motorista;
+import TioDaPerua.BackEndJava.entities.Responsavel;
+import TioDaPerua.BackEndJava.entities.Solicitacao;
 import TioDaPerua.BackEndJava.entities.Usuario;
+import TioDaPerua.BackEndJava.enums.StatusSolicitacao;
 import TioDaPerua.BackEndJava.entities.Viagem;
 import TioDaPerua.BackEndJava.entities.ViagemDia;
 import TioDaPerua.BackEndJava.entities.ViagemParada;
@@ -171,6 +174,43 @@ class ViagemRotaTest {
         assertTrue(viagem.getAtivo());
         assertEquals(List.of(escolaMantida), viagem.getEscolas());
         verify(viagemRepository).save(viagem);
+    }
+
+    @Test
+    void removingSchoolCancelsOpenRequestsOfItsStudentsAndNotifiesResponsavel() {
+        Escola removida = escola(7L);
+        Escola mantida = escola(8L);
+        ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
+        Viagem viagem = execucao.getViagem();
+        viagem.setId(70L);
+        viagem.setAtivo(true);
+        viagem.setEscolas(new ArrayList<>(List.of(removida, mantida)));
+
+        Usuario usuarioResponsavel = new Usuario();
+        usuarioResponsavel.setId(300L);
+        Responsavel responsavel = new Responsavel();
+        responsavel.setUsuario(usuarioResponsavel);
+        Dependente aluno = new Dependente();
+        aluno.setId(9L);
+        aluno.setNome("Enzo");
+        aluno.setEscola(removida);
+        Solicitacao pedido = new Solicitacao();
+        pedido.setId(11L);
+        pedido.setRespondido(false);
+        pedido.setResponsavel(responsavel);
+        pedido.setDependente(aluno);
+
+        when(viagemRepository.findAtivasByMotoristaId(200L)).thenReturn(List.of(viagem));
+        when(solicitacaoRepository.findAbertasPorViagemEEscola(70L, 7L)).thenReturn(List.of(pedido));
+
+        service.removerEscolaDoMotorista(200L, 7L, execucao.getViagem().getMotorista().getUsuario());
+
+        assertTrue(pedido.isRespondido());
+        assertFalse(pedido.isAceito());
+        assertEquals(StatusSolicitacao.RECUSADA, pedido.getStatus());
+        verify(solicitacaoRepository).save(pedido);
+        verify(notificacaoService).criarNotificacoesAutomaticas(any(), eq(List.of(300L)), any(), any(), any());
+        assertTrue(viagem.getAtivo());
     }
 
     @Test
