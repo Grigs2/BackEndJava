@@ -46,7 +46,7 @@ Regras:
 
 Resposta: `200` com o `ViagemDTO` atualizado.
 
-Os alunos das novas escolas **não entram automaticamente** nas execuções. Eles entram quando o responsável aceita a solicitação.
+**Regra a ser seguida pelo front:** ao adicionar escolas, o back **não** insere paradas nem presenças nas execuções. Os alunos dessas escolas entram na execução somente quando o responsável aceita a solicitação. A tela não deve assumir inserção automática.
 
 ### 2.3 Criação da viagem
 
