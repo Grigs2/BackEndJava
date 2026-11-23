@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.services;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.entities.EnderecoOperacional;
@@ -79,7 +80,7 @@ class ViagemEnderecoSnapshotTest {
         motorista.setUsuario(usuarioMotorista);
         viagem.setMotorista(motorista);
         when(viagemRepository.findByIdForUpdate(77L)).thenReturn(Optional.of(viagem));
-        when(viagemDiaRepository.findByViagemIdAndData(77L, LocalDate.now())).thenReturn(Optional.empty());
+        when(viagemDiaRepository.findByViagemIdAndData(77L, DataBrasilia.hoje())).thenReturn(Optional.empty());
         when(viagemDiaRepository.save(any(ViagemDia.class)))
                 .thenAnswer(invocation -> {
                     ViagemDia salvo = invocation.getArgument(0);

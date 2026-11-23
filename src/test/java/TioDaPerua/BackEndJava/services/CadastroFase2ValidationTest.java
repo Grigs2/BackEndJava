@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.services;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.EnderecoOperacional;
 import TioDaPerua.BackEndJava.entities.Motorista;
@@ -37,23 +38,22 @@ class CadastroFase2ValidationTest {
 
     @Test
     void requiresMotoristsToBeAtLeastEighteen() {
-        Motorista motorista = motorista(LocalDate.now().minusYears(18).plusDays(1));
+        Motorista motorista = motorista(DataBrasilia.hoje().minusYears(18).plusDays(1));
 
         assertThrows(BusinessException.class, () -> motoristaService.cadastraMotorista(motorista));
     }
 
     @Test
     void requiresStructuredOperationalAddressForNewMotoristRegistration() {
-        Motorista motorista = motorista(LocalDate.now().minusYears(18));
+        Motorista motorista = motorista(DataBrasilia.hoje().minusYears(18));
         motorista.getUsuario().setEnderecoOperacional(null);
-        when(motoristaRepository.existsByCpf("52998224725")).thenReturn(false);
 
         assertThrows(BusinessException.class, () -> motoristaService.cadastraMotorista(motorista));
     }
 
     @Test
     void acceptsMotoristAtExactEighteenYearBoundary() {
-        Motorista motorista = motorista(LocalDate.now().minusYears(18));
+        Motorista motorista = motorista(DataBrasilia.hoje().minusYears(18));
         when(enderecoOperacionalService.validar(any(EnderecoOperacional.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(motoristaRepository.existsByCpf("52998224725")).thenReturn(false);
@@ -84,7 +84,6 @@ class CadastroFase2ValidationTest {
     void enforcesPasswordPolicyForNewMotoristAccounts() {
         Motorista motorista = motorista(LocalDate.now().minusYears(18));
         motorista.getUsuario().setSenha("curta");
-        when(motoristaRepository.existsByCpf("52998224725")).thenReturn(false);
 
         assertThrows(BusinessException.class, () -> motoristaService.cadastraMotorista(motorista));
     }

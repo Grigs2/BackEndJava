@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.services;
 
+import TioDaPerua.BackEndJava.config.DataBrasilia;
 import TioDaPerua.BackEndJava.entities.AusenciaInformada;
 import TioDaPerua.BackEndJava.entities.Dependente;
 import TioDaPerua.BackEndJava.entities.Usuario;
@@ -51,7 +52,7 @@ class AusenciaServiceTest {
 
     @Test
     void recusaDataForaDoIntervaloOuTrechoInvalido() {
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = DataBrasilia.hoje();
         assertThrows(BusinessException.class, () -> service.registrar(7L, 1L, hoje.minusDays(1), "TODOS", null));
         assertThrows(BusinessException.class, () -> service.registrar(7L, 1L, hoje.plusDays(61), "TODOS", null));
         assertThrows(BusinessException.class, () -> service.registrar(7L, 1L, hoje, "MEIO", null));
@@ -60,7 +61,7 @@ class AusenciaServiceTest {
 
     @Test
     void recusaAusenciaRepetidaParaOMesmoDia() {
-        LocalDate amanha = LocalDate.now().plusDays(1);
+        LocalDate amanha = DataBrasilia.hoje().plusDays(1);
         when(ausenciaRepository.existsByDependenteIdAndDataAndTrecho(7L, amanha, "IDA")).thenReturn(false);
         when(ausenciaRepository.existsByDependenteIdAndDataAndTrecho(7L, amanha, "TODOS")).thenReturn(true);
         assertThrows(ConflictException.class, () -> service.registrar(7L, 1L, amanha, "ida", null));
@@ -68,14 +69,14 @@ class AusenciaServiceTest {
 
     @Test
     void idaEVoltaConflitaComQualquerAvisoDoDia() {
-        LocalDate amanha = LocalDate.now().plusDays(1);
+        LocalDate amanha = DataBrasilia.hoje().plusDays(1);
         when(ausenciaRepository.existsByDependenteIdAndData(7L, amanha)).thenReturn(true);
         assertThrows(ConflictException.class, () -> service.registrar(7L, 1L, amanha, "TODOS", null));
     }
 
     @Test
     void registraEAvisaOsOutrosResponsaveis() {
-        LocalDate amanha = LocalDate.now().plusDays(1);
+        LocalDate amanha = DataBrasilia.hoje().plusDays(1);
         Dependente enzo = new Dependente();
         enzo.setId(7L);
         enzo.setNome("Enzo Souza");
