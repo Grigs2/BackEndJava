@@ -1,5 +1,6 @@
 package TioDaPerua.BackEndJava.repositories;
 
+import TioDaPerua.BackEndJava.entities.Escola;
 import TioDaPerua.BackEndJava.entities.ViagemEscola;
 import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import jakarta.persistence.LockModeType;
@@ -28,6 +29,17 @@ public interface ViagemEscolaRepository extends JpaRepository<ViagemEscola, Long
     List<Long> listarIdsEscolasAtivasDoMotorista(
             @Param("motoristaId") Long motoristaId,
             @Param("escolaIds") Collection<Long> escolaIds,
+            @Param("status") StatusVinculoEscola status);
+
+    /** Escolas com vínculo ATIVO do motorista, usadas para oferecer escolas a uma viagem. */
+    @Query("""
+        SELECT DISTINCT v.escola FROM ViagemEscola v
+        WHERE v.motorista.id = :motoristaId
+        AND v.status = :status
+        ORDER BY v.escola.nome
+    """)
+    List<Escola> listarEscolasDoMotoristaPorStatus(
+            @Param("motoristaId") Long motoristaId,
             @Param("status") StatusVinculoEscola status);
 
     /** Motoristas com vínculo ATIVO com pelo menos uma das escolas informadas. */

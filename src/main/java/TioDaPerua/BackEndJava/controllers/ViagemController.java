@@ -67,6 +67,27 @@ public class ViagemController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ViagemDTO.toDTO(salva));
     }
 
+    @GetMapping("/EscolasDisponiveis/{idViagem}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
+    public ResponseEntity<List<EscolaResumoDTO>> EscolasDisponiveis(@PathVariable Long idViagem) {
+        if (idViagem == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(viagemService.listarEscolasDisponiveis(idViagem).stream()
+                .map(e -> new EscolaResumoDTO(e.getId(), e.getNome()))
+                .toList());
+    }
+
+    @PostMapping("/AdicionarEscolas/{idViagem}")
+    @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
+    public ResponseEntity<ViagemDTO> AdicionarEscolas(@PathVariable Long idViagem,
+                                                      @Valid @RequestBody AdicionarEscolasViagemDTO dto) {
+        if (idViagem == null || dto == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(ViagemDTO.toDTO(viagemService.adicionarEscolas(idViagem, dto.escolaIds())));
+    }
+
     @PutMapping("/AtualizarNome/{idViagem}")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isDonoDaViagem(authentication, #p0)")
     public ResponseEntity<ViagemDTO> AtualizarNome(@PathVariable Long idViagem, @RequestBody NomeViagemDTO dto) {

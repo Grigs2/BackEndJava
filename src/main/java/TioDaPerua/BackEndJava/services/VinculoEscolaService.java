@@ -45,6 +45,7 @@ public class VinculoEscolaService {
     private final HistoricoVinculoEscolaRepository historicoRepository;
     private final ViagemDependenteRepository viagemDependenteRepository;
     private final DocumentoMotoristaService documentoMotoristaService;
+    private final ViagemService viagemService;
 
     public VinculoEscolaService(EscolaRepository escolaRepository,
                                 MotoristaRepository motoristaRepository,
@@ -52,7 +53,8 @@ public class VinculoEscolaService {
                                 ViagemEscolaRepository vinculoRepository,
                                 HistoricoVinculoEscolaRepository historicoRepository,
                                 ViagemDependenteRepository viagemDependenteRepository,
-                                DocumentoMotoristaService documentoMotoristaService) {
+                                DocumentoMotoristaService documentoMotoristaService,
+                                ViagemService viagemService) {
         this.escolaRepository = escolaRepository;
         this.motoristaRepository = motoristaRepository;
         this.usuarioRepository = usuarioRepository;
@@ -60,6 +62,7 @@ public class VinculoEscolaService {
         this.historicoRepository = historicoRepository;
         this.viagemDependenteRepository = viagemDependenteRepository;
         this.documentoMotoristaService = documentoMotoristaService;
+        this.viagemService = viagemService;
     }
 
     @Transactional(readOnly = true)
@@ -171,7 +174,7 @@ public class VinculoEscolaService {
         validarEstado(vinculo, StatusVinculoEscola.ATIVO);
         alterarEstado(vinculo, StatusVinculoEscola.SUSPENSO,
                 ator, motivoObrigatorioSeAplicavel(motivo, true, "suspender"));
-        encerrarAcordosDoVinculo(vinculo);
+        encerrarAcordosDoVinculo(vinculo, ator);
         return VinculoEscolaDTO.toDTO(vinculo);
     }
 
@@ -195,14 +198,16 @@ public class VinculoEscolaService {
         }
         alterarEstado(vinculo, StatusVinculoEscola.ENCERRADO,
                 ator, motivoObrigatorioSeAplicavel(motivo, true, "encerrar"));
-        encerrarAcordosDoVinculo(vinculo);
+        encerrarAcordosDoVinculo(vinculo, ator);
         return VinculoEscolaDTO.toDTO(vinculo);
     }
 
-    /** Sem vínculo ativo com a escola, os acordos do motorista com os alunos dela deixam de valer. */
-    private void encerrarAcordosDoVinculo(ViagemEscola vinculo) {
-        viagemDependenteRepository.desativarAcordosDoMotoristaNaEscola(
-                vinculo.getMotorista().getId(), vinculo.getEscola().getId());
+    /** Sem vínculo ativo com a escola, a escola sai das viagens do motorista e os acordos com os alunos dela deixam de valer. */
+    private void encerrarAcordosDoVinculo(ViagemEscola vinculo, Usuario ator) {
+        Long motoristaId = vinculo.getMotorista().getId();
+        Long escolaId = vinculo.getEscola().getId();
+        viagemDependenteRepository.desativarAcordosDoMotoristaNaEscola(motoristaId, escolaId);
+        viagemService.removerEscolaDoMotorista(motoristaId, escolaId, ator);
     }
 
     private void validarDocumentosDoMotorista(Motorista motorista) {

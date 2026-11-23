@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public interface HistoricoViagemPresencaRepository extends JpaRepository<HistoricoViagemPresenca, Long> {
 
+    boolean existsByPresencaId(Long presencaId);
+
     @EntityGraph(attributePaths = {"presenca", "presenca.dependente", "ator"})
     List<HistoricoViagemPresenca> findByPresenca_ViagemDia_IdOrderByOcorridoEmAscIdAsc(Long viagemDiaId);
 

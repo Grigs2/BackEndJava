@@ -6,6 +6,7 @@ import TioDaPerua.BackEndJava.entities.ViagemDia;
 import TioDaPerua.BackEndJava.enums.Periodo;
 import TioDaPerua.BackEndJava.enums.StatusViagemDia;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
+import TioDaPerua.BackEndJava.exceptions.ConflictException;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemDiaRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemRepository;
@@ -106,5 +107,25 @@ class ViagemHorarioPartidaTest {
         assertThrows(DateTimeParseException.class, () -> HorarioPartida.converter("25:00"));
         assertThrows(DateTimeParseException.class, () -> HorarioPartida.converter("7h"));
         assertNull(HorarioPartida.resolver(new Viagem(), null));
+    }
+
+    @Test
+    void changingViagemDefaultIsRejectedWhenTodaysExecutionAlreadyStarted() {
+        ReflectionTestUtils.setField(service, "relogio",
+                Clock.fixed(Instant.parse("2026-11-18T12:00:00Z"), ZoneId.of("America/Sao_Paulo")));
+        Viagem viagem = new Viagem();
+        viagem.setId(9L);
+        viagem.setAtivo(true);
+        viagem.setPeriodo(Periodo.MANHA_IDA);
+        viagem.setHorarioPartidaPadrao(LocalTime.of(7, 0));
+        ViagemDia hoje = new ViagemDia();
+        hoje.setData(HOJE);
+        hoje.setStatus(StatusViagemDia.EM_ANDAMENTO);
+        when(viagemRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(viagem));
+        when(viagemDiaRepository.findByViagemIdAndData(9L, HOJE)).thenReturn(Optional.of(hoje));
+
+        assertThrows(ConflictException.class, () -> service.alterarHorarioPartidaPadrao(9L, LocalTime.of(8, 15)));
+        assertEquals(LocalTime.of(7, 0), viagem.getHorarioPartidaPadrao());
+        verify(viagemRepository, never()).save(any());
     }
 }

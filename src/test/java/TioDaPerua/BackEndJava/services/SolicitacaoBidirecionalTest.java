@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -133,6 +134,18 @@ class SolicitacaoBidirecionalTest {
         verify(notificacaoService).criarNotificacoesAutomaticas(
                 org.mockito.ArgumentMatchers.eq(USUARIO_MOTORISTA), org.mockito.ArgumentMatchers.eq(List.of(USUARIO_RESPONSAVEL)), org.mockito.ArgumentMatchers.eq("Pedido de vaga aceito"), org.mockito.ArgumentMatchers.eq("Seu pedido de vaga para Enzo foi aceito."),
                 org.mockito.ArgumentMatchers.argThat((NotificacaoService.Contexto c) -> c.tipo() == TioDaPerua.BackEndJava.enums.TipoNotificacao.SOLICITACAO));
+    }
+
+    @Test
+    void motoristaNaoAceitaAlunoDeEscolaRemovidaDaViagem() {
+        Solicitacao s = solicitacaoAberta(OrigemSolicitacao.RESPONSAVEL);
+        s.setDependente(dependente(s.getResponsavel(), escola(2L, "EMEF Removida")));
+        when(solicitacaoRepository.findById(5L)).thenReturn(Optional.of(s));
+
+        assertThrows(ConflictException.class, () -> service.responderComoMotorista(5L, true, USUARIO_MOTORISTA));
+
+        verify(viagemDependenteRepository, never()).save(any());
+        assertFalse(s.isRespondido());
     }
 
     @Test
