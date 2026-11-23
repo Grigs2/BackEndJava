@@ -263,6 +263,139 @@ public class ViagemService {
         solicitacaoRepository.encerrarPorViagemId(idViagem, DataBrasilia.agora());
     }
 
+    /** Escolas com vínculo ativo do motorista que ainda não são atendidas pela viagem. */
+    @Transactional(readOnly = true)
+    public List<Escola> listarEscolasDisponiveis(Long idViagem) {
+        Viagem viagem = buscarViagem(idViagem);
+        Set<Long> atendidas = viagem.getEscolas().stream().map(Escola::getId).collect(Collectors.toSet());
+        return viagemEscolaRepository.listarEscolasDoMotoristaPorStatus(
+                        viagem.getMotorista().getId(), StatusVinculoEscola.ATIVO).stream()
+                .filter(escola -> !atendidas.contains(escola.getId()))
+                .toList();
+    }
+
+    /**
+     * Adiciona escolas ao itinerário. Só entram escolas com vínculo ATIVO com o motorista e a viagem
+     * não pode ter sido iniciada hoje. Os alunos das novas escolas entram nas execuções quando o
+     * responsável aceitar a solicitação.
+     */
+    @Transactional
+    public Viagem adicionarEscolas(Long idViagem, List<Long> escolaIds) {
+        if (escolaIds == null || escolaIds.isEmpty()) {
+            throw new BusinessException("Informe ao menos uma escola para adicionar");
+        }
+        if (escolaIds.stream().distinct().count() != escolaIds.size()) {
+            throw new BusinessException("Não é permitido informar a mesma escola mais de uma vez");
+        }
+        Viagem viagem = viagemRepository.findByIdForUpdate(idViagem)
+                .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
+        if (!Boolean.TRUE.equals(viagem.getAtivo())) {
+            throw new ConflictException("Não é possível alterar escolas de um itinerário desativado");
+        }
+        validarViagemNaoIniciadaHoje(idViagem);
+
+        List<Escola> escolas = escolaRepository.findAllById(escolaIds);
+        if (escolas.size() != escolaIds.size()) {
+            throw new ResourceNotFoundException("Escola não encontrada entre os ids: " + escolaIds);
+        }
+        Long motoristaId = viagem.getMotorista().getId();
+        Set<Long> comVinculoAtivo = new HashSet<>(viagemEscolaRepository.listarIdsEscolasAtivasDoMotorista(
+                motoristaId, escolaIds, StatusVinculoEscola.ATIVO));
+        if (comVinculoAtivo.size() != escolaIds.size()) {
+            throw new ConflictException("Só é possível adicionar escolas com vínculo ativo com o motorista");
+        }
+
+        Set<Long> jaAtendidas = viagem.getEscolas().stream().map(Escola::getId).collect(Collectors.toSet());
+        escolas.stream()
+                .filter(escola -> !jaAtendidas.contains(escola.getId()))
+                .forEach(escola -> viagem.getEscolas().add(escola));
+        return viagemRepository.save(viagem);
+    }
+
+    /**
+     * Remove a escola de todos os itinerários ativos do motorista, chamado quando o vínculo escolar termina.
+     * Em execuções planejadas a partir de hoje, os alunos dessa escola saem das paradas e das presenças.
+     * Itinerário que fica sem escola é desativado.
+     */
+    @Transactional
+    public void removerEscolaDoMotorista(Long motoristaId, Long escolaId, Usuario ator) {
+        LocalDate hoje = LocalDate.now(relogio);
+        for (Viagem viagem : viagemRepository.findAtivasByMotoristaId(motoristaId)) {
+            boolean atendiaEscola = viagem.getEscolas().stream().anyMatch(e -> escolaId.equals(e.getId()));
+            if (!atendiaEscola) {
+                continue;
+            }
+            viagem.getEscolas().removeIf(e -> escolaId.equals(e.getId()));
+            if (viagem.getEscolas().isEmpty()) {
+                desativarViagem(viagem.getId());
+            } else {
+                viagemRepository.save(viagem);
+                removerAlunosDaEscolaNasExecucoesPlanejadas(viagem.getId(), escolaId, hoje, ator);
+            }
+        }
+    }
+
+    private void removerAlunosDaEscolaNasExecucoesPlanejadas(Long idViagem, Long escolaId, LocalDate hoje, Usuario ator) {
+        LocalDateTime agora = DataBrasilia.agora();
+        for (ViagemDia execucao : viagemDiaRepository.findByViagemIdAndStatusAndDataGreaterThanEqual(
+                idViagem, StatusViagemDia.PLANEJADA, hoje)) {
+            List<ViagemPresenca> presencasDaEscola = viagemPresencaRepository.findByViagemDiaId(execucao.getId()).stream()
+                    .filter(p -> p.getDependente().getEscola() != null
+                            && escolaId.equals(p.getDependente().getEscola().getId()))
+                    .toList();
+            if (presencasDaEscola.isEmpty()) {
+                continue;
+            }
+            Set<Long> presencasRemovidas = presencasDaEscola.stream()
+                    .map(ViagemPresenca::getId).collect(Collectors.toSet());
+
+            List<ViagemParada> paradas = viagemParadaRepository.listarPorViagemDia(execucao.getId());
+            if (paradas.isEmpty()) {
+                continue;
+            }
+            paradas.forEach(parada -> parada.getParticipantes()
+                    .removeIf(participante -> presencasRemovidas.contains(participante.getPresenca().getId())));
+            ViagemParada primeira = paradas.get(0);
+            ViagemParada ultima = paradas.get(paradas.size() - 1);
+            List<ViagemParada> vazias = paradas.stream()
+                    .filter(parada -> parada.getParticipantes().isEmpty())
+                    .filter(parada -> parada != primeira && parada != ultima)
+                    .toList();
+            viagemParadaRepository.deleteAll(vazias);
+            viagemParadaRepository.flush();
+
+            List<ViagemParada> restantes = paradas.stream().filter(p -> !vazias.contains(p)).toList();
+            int[] ordensAnteriores = restantes.stream().mapToInt(ViagemParada::getOrdem).toArray();
+            // Valores temporários negativos evitam conflito com a unicidade (viagem_dia_id, ordem).
+            for (int i = 0; i < restantes.size(); i++) {
+                restantes.get(i).setOrdem(-(i + 1));
+            }
+            viagemParadaRepository.saveAllAndFlush(restantes);
+            for (int i = 0; i < restantes.size(); i++) {
+                ViagemParada parada = restantes.get(i);
+                parada.setOrdem(i + 1);
+                if (ordensAnteriores[i] != i + 1) {
+                    registrarOrdemParada(execucao, parada, ordensAnteriores[i], i + 1, ator, agora);
+                }
+            }
+            viagemParadaRepository.saveAll(restantes);
+
+            presencasDaEscola.stream()
+                    .filter(p -> !historicoViagemPresencaRepository.existsByPresencaId(p.getId()))
+                    .forEach(viagemPresencaRepository::delete);
+        }
+    }
+
+    /** Execução de hoje já iniciada ou finalizada: o itinerário não pode mais ser alterado. */
+    private void validarViagemNaoIniciadaHoje(Long idViagem) {
+        LocalDate hoje = LocalDate.now(relogio);
+        viagemDiaRepository.findByViagemIdAndData(idViagem, hoje)
+                .filter(dia -> dia.getStatus() != StatusViagemDia.PLANEJADA)
+                .ifPresent(dia -> {
+                    throw new ConflictException("A viagem de hoje já foi iniciada e não pode ser alterada");
+                });
+    }
+
     public MotoristaViagemDTO consultarMotorista(Long idViagemDia) {
         ViagemDia vd = viagemDiaRepository.findById(idViagemDia)
                 .orElseThrow(() -> new ResourceNotFoundException("Execução de viagem não encontrada com id: " + idViagemDia));
@@ -480,12 +613,12 @@ public class ViagemService {
     }
 
     /**
-     * Sincroniza as execuções ainda PLANEJADAS (de hoje em diante, em Brasília) com os vínculos ativos da viagem:
-     * alunos aceitos depois da preparação ganham presença e as paradas são reconstruídas. Execuções já iniciadas
-     * ou encerradas mantêm o snapshot original.
+     * Inclui o aluno aceito nas execuções ainda PLANEJADAS (de hoje em diante, em Brasília): ganha presença e
+     * suas paradas são anexadas ao fim da rota, sem reordenar as existentes. Execuções já iniciadas ou encerradas
+     * mantêm o snapshot original.
      */
     @Transactional
-    public void incluirDependenteEmExecucoesPlanejadas(Long idViagem, Long idDependente) {
+    public void incluirDependenteEmExecucoesPlanejadas(Long idViagem, Long idDependente, Long atorUsuarioId) {
         List<ViagemDia> execucoes = viagemDiaRepository.findByViagemIdAndStatusAndDataGreaterThanEqual(
                 idViagem, StatusViagemDia.PLANEJADA, LocalDate.now(relogio));
         if (execucoes.isEmpty()) return;
@@ -496,41 +629,32 @@ public class ViagemService {
                 .findByDependenteIdInAndAtivoTrue(vinculados.stream().map(v -> v.getDependente().getId()).toList())
                 .stream()
                 .collect(Collectors.groupingBy(endereco -> endereco.getDependente().getId()));
+        Usuario ator = usuarioRepository.findById(atorUsuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado"));
 
         for (ViagemDia execucao : execucoes) {
-            Set<Long> comPresenca = viagemPresencaRepository.findByViagemDiaId(execucao.getId()).stream()
-                    .map(presenca -> presenca.getDependente().getId())
-                    .collect(Collectors.toSet());
-            List<ViagemDependente> faltantes = vinculados.stream()
-                    .filter(v -> !comPresenca.contains(v.getDependente().getId()))
-                    .toList();
-            if (faltantes.isEmpty()) continue;
+            boolean jaPresente = viagemPresencaRepository.findByViagemDiaId(execucao.getId()).stream()
+                    .anyMatch(presenca -> presenca.getDependente().getId().equals(idDependente));
+            if (jaPresente) continue;
 
-            if (!historicoOrdemParadaRepository.findByViagemDia_IdOrderByOcorridoEmAscIdAsc(execucao.getId()).isEmpty()) {
-                throw new ConflictException("A rota de " + execucao.getData()
-                        + " já foi reordenada; não é possível incluir o aluno automaticamente nesta execução");
-            }
+            Dependente dependente = vinculados.stream()
+                    .map(ViagemDependente::getDependente)
+                    .filter(d -> d.getId().equals(idDependente))
+                    .findFirst()
+                    .orElseThrow();
+            ViagemPresenca presenca = new ViagemPresenca();
+            presenca.setViagemDia(execucao);
+            presenca.setDependente(dependente);
+            presenca.setStatus(StatusViagemPresenca.ESPERANDO);
+            preencherSnapshots(presenca, dependente,
+                    enderecosPorDependente.getOrDefault(dependente.getId(), List.of()));
+            viagemPresencaRepository.saveAndFlush(presenca);
+            aplicarAusenciasInformadas(execucao, List.of(idDependente));
 
-            List<Long> novosIds = new ArrayList<>();
-            for (ViagemDependente vd : faltantes) {
-                Dependente dependente = vd.getDependente();
-                ViagemPresenca presenca = new ViagemPresenca();
-                presenca.setViagemDia(execucao);
-                presenca.setDependente(dependente);
-                presenca.setStatus(StatusViagemPresenca.ESPERANDO);
-                preencherSnapshots(presenca, dependente,
-                        enderecosPorDependente.getOrDefault(dependente.getId(), List.of()));
-                viagemPresencaRepository.save(presenca);
-                novosIds.add(dependente.getId());
-            }
-            viagemPresencaRepository.flush();
-            aplicarAusenciasInformadas(execucao, novosIds);
-
-            viagemParadaRepository.deleteAll(viagemParadaRepository.listarPorViagemDia(execucao.getId()));
-            viagemParadaRepository.flush();
-            materializarParadas(execucao, gerarParadasProjetadas(execucao), vinculados, enderecosPorDependente);
+            anexarParadasDosNovos(execucao, vinculados, Set.of(idDependente), ator, enderecosPorDependente);
         }
     }
+
 
     /**
      * Alunos com ausência avisada pelo responsável para a data já entram como FALTOU (o histórico registra o
@@ -571,42 +695,151 @@ public class ViagemService {
                 .collect(Collectors.toMap(Dependente::getId, dependente -> dependente));
         boolean ida = isViagemIda(viagemDia.getViagem().getPeriodo());
         List<ViagemParada> entidades = new ArrayList<>();
-
         for (ParadaDTO dto : paradas) {
-            ViagemParada parada = new ViagemParada();
-            parada.setViagemDia(viagemDia);
-            parada.setOrdem(dto.ordem());
-            parada.setTipoParada(dto.tipoParada());
-            TipoOperacaoParada operacao = dto.tipoParada() == TipoParada.MOTORISTA
-                    ? TipoOperacaoParada.EXTREMO
-                    : dto.tipoParada() == TipoParada.RESPONSAVEL
-                    ? (ida ? TipoOperacaoParada.EMBARQUE : TipoOperacaoParada.DESEMBARQUE)
-                    : (ida ? TipoOperacaoParada.DESEMBARQUE : TipoOperacaoParada.EMBARQUE);
-            parada.setOperacao(operacao);
-            parada.setNomeLocal(dto.nomeLocal());
-            parada.setEndereco(dto.endereco());
-
-            if (dto.listaDependentes() != null) {
-                for (DependenteParadaDTO participanteDTO : dto.listaDependentes()) {
-                    ViagemPresenca presenca = presencasPorDependente.get(participanteDTO.id());
-                    if (presenca == null) {
-                        throw new BusinessException("Participante da parada não possui presença na execução");
-                    }
-                    ViagemParadaParticipante participante = new ViagemParadaParticipante();
-                    participante.setParada(parada);
-                    participante.setPresenca(presenca);
-                    participante.setDependenteIdSnapshot(participanteDTO.id());
-                    participante.setNomeDependenteSnapshot(participanteDTO.nomeDependente());
-                    participante.setNomeResponsavelSnapshot(participanteDTO.nomeResponsavel());
-                    parada.getParticipantes().add(participante);
-                }
-            }
-            parada.setStatusValidacaoEndereco(statusEnderecoParada(
-                    parada, dependentesPorId, enderecosPorDependente, ida));
-            entidades.add(parada);
+            entidades.add(criarParada(viagemDia, dto, presencasPorDependente, dependentesPorId, enderecosPorDependente, ida));
         }
         viagemParadaRepository.saveAll(entidades);
         viagemParadaRepository.flush();
+    }
+
+    private ViagemParada criarParada(ViagemDia viagemDia,
+                                     ParadaDTO dto,
+                                     Map<Long, ViagemPresenca> presencasPorDependente,
+                                     Map<Long, Dependente> dependentesPorId,
+                                     Map<Long, List<EnderecoDependente>> enderecosPorDependente,
+                                     boolean ida) {
+        ViagemParada parada = new ViagemParada();
+        parada.setViagemDia(viagemDia);
+        parada.setOrdem(dto.ordem());
+        parada.setTipoParada(dto.tipoParada());
+        parada.setOperacao(operacaoDaParada(dto.tipoParada(), ida));
+        parada.setNomeLocal(dto.nomeLocal());
+        parada.setEndereco(dto.endereco());
+        if (dto.listaDependentes() != null) {
+            for (DependenteParadaDTO participanteDTO : dto.listaDependentes()) {
+                adicionarParticipante(parada, participanteDTO, presencasPorDependente);
+            }
+        }
+        parada.setStatusValidacaoEndereco(statusEnderecoParada(
+                parada, dependentesPorId, enderecosPorDependente, ida));
+        return parada;
+    }
+
+    private TipoOperacaoParada operacaoDaParada(TipoParada tipo, boolean ida) {
+        return tipo == TipoParada.MOTORISTA
+                ? TipoOperacaoParada.EXTREMO
+                : tipo == TipoParada.RESPONSAVEL
+                ? (ida ? TipoOperacaoParada.EMBARQUE : TipoOperacaoParada.DESEMBARQUE)
+                : (ida ? TipoOperacaoParada.DESEMBARQUE : TipoOperacaoParada.EMBARQUE);
+    }
+
+    private void adicionarParticipante(ViagemParada parada,
+                                       DependenteParadaDTO participanteDTO,
+                                       Map<Long, ViagemPresenca> presencasPorDependente) {
+        ViagemPresenca presenca = presencasPorDependente.get(participanteDTO.id());
+        if (presenca == null) {
+            throw new BusinessException("Participante da parada não possui presença na execução");
+        }
+        ViagemParadaParticipante participante = new ViagemParadaParticipante();
+        participante.setParada(parada);
+        participante.setPresenca(presenca);
+        participante.setDependenteIdSnapshot(participanteDTO.id());
+        participante.setNomeDependenteSnapshot(participanteDTO.nomeDependente());
+        participante.setNomeResponsavelSnapshot(participanteDTO.nomeResponsavel());
+        parada.getParticipantes().add(participante);
+    }
+
+    /**
+     * Anexa ao fim da rota as paradas dos alunos recém-incluídos, sem reordenar as paradas existentes. Quem tem o
+     * mesmo tipo e local de uma parada já existente entra nela; os demais criam paradas novas antes da parada final
+     * do motorista, que continua por último. Cada alteração de ordem fica no histórico com o ator informado.
+     */
+    private void anexarParadasDosNovos(ViagemDia execucao,
+                                       List<ViagemDependente> vinculados,
+                                       Set<Long> novosIds,
+                                       Usuario ator,
+                                       Map<Long, List<EnderecoDependente>> enderecosPorDependente) {
+        List<ViagemParada> existentes = viagemParadaRepository.listarPorViagemDia(execucao.getId());
+        if (existentes.isEmpty()) {
+            materializarParadas(execucao, gerarParadasProjetadas(execucao), vinculados, enderecosPorDependente);
+            return;
+        }
+
+        Map<Long, ViagemPresenca> presencasPorDependente = viagemPresencaRepository
+                .findByViagemDiaId(execucao.getId()).stream()
+                .collect(Collectors.toMap(presenca -> presenca.getDependente().getId(), presenca -> presenca));
+        Map<Long, Dependente> dependentesPorId = vinculados.stream()
+                .map(ViagemDependente::getDependente)
+                .collect(Collectors.toMap(Dependente::getId, dependente -> dependente));
+        boolean ida = isViagemIda(execucao.getViagem().getPeriodo());
+        LocalDateTime agora = DataBrasilia.agora();
+
+        List<ParadaDTO> projecao = gerarParadasProjetadas(execucao).stream()
+                .filter(dto -> dto.tipoParada() != TipoParada.MOTORISTA)
+                .map(dto -> new ParadaDTO(dto.ordem(), dto.tipoParada(), dto.nomeLocal(), dto.endereco(),
+                        dto.listaDependentes().stream().filter(d -> novosIds.contains(d.id())).toList()))
+                .filter(dto -> !dto.listaDependentes().isEmpty())
+                .toList();
+
+        List<ParadaDTO> novasParadas = new ArrayList<>();
+        for (ParadaDTO dto : projecao) {
+            ViagemParada existente = existentes.stream()
+                    .filter(p -> p.getTipoParada() == dto.tipoParada()
+                            && Objects.equals(p.getEndereco(), dto.endereco()))
+                    .findFirst()
+                    .orElse(null);
+            if (existente == null) {
+                novasParadas.add(dto);
+                continue;
+            }
+            for (DependenteParadaDTO participanteDTO : dto.listaDependentes()) {
+                adicionarParticipante(existente, participanteDTO, presencasPorDependente);
+            }
+            existente.setStatusValidacaoEndereco(statusEnderecoParada(
+                    existente, dependentesPorId, enderecosPorDependente, ida));
+            viagemParadaRepository.save(existente);
+        }
+
+        if (novasParadas.isEmpty()) {
+            viagemParadaRepository.flush();
+            return;
+        }
+
+        ViagemParada fim = existentes.get(existentes.size() - 1);
+        int ordemFimAnterior = fim.getOrdem();
+        int ordemFimNova = ordemFimAnterior + novasParadas.size();
+        // Libera a ordem da parada final antes de inserir as novas, por causa da restrição única (viagem_dia_id, ordem).
+        fim.setOrdem(ordemFimNova);
+        viagemParadaRepository.saveAndFlush(fim);
+        registrarOrdemParada(execucao, fim, ordemFimAnterior, ordemFimNova, ator, agora);
+
+        List<ViagemParada> criadas = new ArrayList<>();
+        for (int indice = 0; indice < novasParadas.size(); indice++) {
+            int ordem = ordemFimAnterior + indice;
+            ParadaDTO dto = novasParadas.get(indice);
+            ViagemParada parada = criarParada(execucao,
+                    new ParadaDTO(ordem, dto.tipoParada(), dto.nomeLocal(), dto.endereco(), dto.listaDependentes()),
+                    presencasPorDependente, dependentesPorId, enderecosPorDependente, ida);
+            criadas.add(parada);
+        }
+        viagemParadaRepository.saveAll(criadas);
+        viagemParadaRepository.flush();
+        for (ViagemParada parada : criadas) {
+            registrarOrdemParada(execucao, parada, 0, parada.getOrdem(), ator, agora);
+        }
+    }
+
+    private void registrarOrdemParada(ViagemDia execucao, ViagemParada parada, int ordemAnterior, int ordemNova,
+                                      Usuario ator, LocalDateTime agora) {
+        HistoricoOrdemParada historico = new HistoricoOrdemParada();
+        historico.setViagemDia(execucao);
+        historico.setParada(parada);
+        // 0 = parada criada nesta alteração, como em reordenarParadas.
+        historico.setOrdemAnterior(ordemAnterior);
+        historico.setOrdemNova(ordemNova);
+        historico.setAtor(ator);
+        historico.setOcorridoEm(agora);
+        historicoOrdemParadaRepository.save(historico);
     }
 
     @Transactional
@@ -887,22 +1120,20 @@ public class ViagemService {
     }
 
     /**
-     * Cria a viagem do motorista para um período. Com escolaIds, a viagem atende essas escolas,
-     * tem nome padrão de ida/volta e só aceita alunos de uma delas.
+     * Cria a viagem do motorista para um período. A viagem atende ao menos uma escola, tem nome padrão
+     * de ida/volta e só aceita alunos de uma delas.
      */
-    public Viagem criarViagem(Long idMotorista, Viagem viagem) {
-        return criarViagem(idMotorista, viagem, null);
-    }
     public Viagem criarViagem(Long idMotorista, Viagem viagem, List<Long> escolaIds) {
         if (viagem == null || idMotorista == null) throw new IllegalArgumentException("Dados da viagem e motorista são obrigatórios");
-        if (escolaIds != null && !escolaIds.isEmpty()) {
-            List<Long> idsUnicos = escolaIds.stream().distinct().toList();
-            List<Escola> escolas = escolaRepository.findAllById(idsUnicos);
-            if (escolas.size() != idsUnicos.size()) {
-                throw new ResourceNotFoundException("Escola não encontrada entre os ids: " + idsUnicos);
-            }
-            viagem.setEscolas(new ArrayList<>(escolas));
+        if (escolaIds == null || escolaIds.isEmpty()) {
+            throw new BusinessException("A viagem deve atender ao menos uma escola");
         }
+        List<Long> idsUnicos = escolaIds.stream().distinct().toList();
+        List<Escola> escolas = escolaRepository.findAllById(idsUnicos);
+        if (escolas.size() != idsUnicos.size()) {
+            throw new ResourceNotFoundException("Escola não encontrada entre os ids: " + idsUnicos);
+        }
+        viagem.setEscolas(new ArrayList<>(escolas));
 
         Motorista motorista = motoristaRepository.findById(idMotorista)
                 .orElseThrow(() -> new ResourceNotFoundException("Motorista não encontrado com id: " + idMotorista));
@@ -928,6 +1159,7 @@ public class ViagemService {
     public Viagem atualizarNome(Long idViagem, String nome) {
         Viagem viagem = viagemRepository.findById(idViagem)
                 .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
+        validarViagemNaoIniciadaHoje(idViagem);
         viagem.setNome(nome);
         return viagemRepository.save(viagem);
     }
@@ -946,6 +1178,7 @@ public class ViagemService {
         if (!Boolean.TRUE.equals(viagem.getAtivo())) {
             throw new ConflictException("Não é possível alterar o horário de um itinerário desativado");
         }
+        validarViagemNaoIniciadaHoje(idViagem);
 
         LocalTime anterior = HorarioPartida.resolver(viagem, null);
         if (anterior != null && !anterior.equals(horario)) {

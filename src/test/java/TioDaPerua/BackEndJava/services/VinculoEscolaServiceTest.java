@@ -55,6 +55,7 @@ class VinculoEscolaServiceTest {
     @Mock private HistoricoVinculoEscolaRepository historicoRepository;
     @Mock private ViagemDependenteRepository viagemDependenteRepository;
     @Mock private DocumentoMotoristaService documentoMotoristaService;
+    @Mock private ViagemService viagemService;
 
     private VinculoEscolaService service;
     private Escola escola;
@@ -67,7 +68,7 @@ class VinculoEscolaServiceTest {
         service = new VinculoEscolaService(
                 escolaRepository, motoristaRepository, usuarioRepository,
                 vinculoRepository, historicoRepository,
-                viagemDependenteRepository, documentoMotoristaService);
+                viagemDependenteRepository, documentoMotoristaService, viagemService);
         escolaUsuario = usuario(ESCOLA_USUARIO_ID, "ESCOLA");
         motoristaUsuario = usuario(MOTORISTA_USUARIO_ID, "MOTORISTA");
 

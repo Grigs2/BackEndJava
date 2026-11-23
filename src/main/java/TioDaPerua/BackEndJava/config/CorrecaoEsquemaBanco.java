@@ -39,6 +39,19 @@ public class CorrecaoEsquemaBanco implements ApplicationRunner {
                 WHEN 'NOITE_IDA' THEN TIME '17:00' WHEN 'NOITE_VOLTA' THEN TIME '17:00'
             END
             WHERE horario_partida_padrao IS NULL
+            """,
+            // Viagens legadas sem escola passam a atender as escolas dos alunos com vínculo ativo na rota.
+            // Só casa viagens sem nenhuma escola, então não se repete depois que a viagem ganha escolas.
+            """
+            INSERT INTO public.viagem_escola_destino (viagem_id, escola_id)
+            SELECT DISTINCT vd.viagem_id, d.escola_id
+            FROM public.viagem_dependente vd
+            JOIN public.dependente d ON d.id = vd.dependente_id
+            WHERE vd.ativo = true
+              AND d.escola_id IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM public.viagem_escola_destino ved WHERE ved.viagem_id = vd.viagem_id
+              )
             """
     );
 

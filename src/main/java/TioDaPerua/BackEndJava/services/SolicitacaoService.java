@@ -215,7 +215,7 @@ public class SolicitacaoService {
         if (aceito) {
             solicitacao.setCompartilhamentoAutorizado(true);
         }
-        Solicitacao salva = registrarResposta(solicitacao, aceito);
+        Solicitacao salva = registrarResposta(solicitacao, aceito, atorUsuarioId);
         Usuario usuarioMotorista = solicitacao.getViagem() == null
                 || solicitacao.getViagem().getMotorista() == null
                 ? null : solicitacao.getViagem().getMotorista().getUsuario();
@@ -256,7 +256,7 @@ public class SolicitacaoService {
             throw new BusinessException("Este convite foi feito por você e aguarda a resposta do responsável");
         }
 
-        Solicitacao salva = registrarResposta(solicitacao, aceito);
+        Solicitacao salva = registrarResposta(solicitacao, aceito, atorUsuarioId);
         Responsavel responsavel = solicitacao.getResponsavel();
         if (responsavel != null && responsavel.getUsuario() != null && responsavel.getUsuario().getId() != null) {
             String estado = aceito ? "aceito" : "recusado";
@@ -293,7 +293,7 @@ public class SolicitacaoService {
         }
     }
 
-    private Solicitacao registrarResposta(Solicitacao solicitacao, boolean aceito) {
+    private Solicitacao registrarResposta(Solicitacao solicitacao, boolean aceito, Long atorUsuarioId) {
         if (aceito) {
             validarPeriodoLivre(solicitacao);
         }
@@ -301,7 +301,7 @@ public class SolicitacaoService {
         solicitacao.setAceito(aceito);
         solicitacao.setStatus(aceito ? StatusSolicitacao.ACEITA : StatusSolicitacao.RECUSADA);
         if (aceito) {
-            abrirAcordo(solicitacao);
+            abrirAcordo(solicitacao, atorUsuarioId);
             encerrarDuplicadas(solicitacao);
         }
         return solicitacaoRepository.save(solicitacao);
@@ -347,7 +347,7 @@ public class SolicitacaoService {
     /**
      * Acordo de transporte do dependente na viagem: é um ViagemDependente ativo, criado ou reativado ao aceitar.
      */
-    private void abrirAcordo(Solicitacao solicitacao) {
+    private void abrirAcordo(Solicitacao solicitacao, Long atorUsuarioId) {
         ViagemDependente vinculo = viagemDependenteRepository
                 .findByViagemIdAndDependenteId(solicitacao.getViagem().getId(), solicitacao.getDependente().getId())
                 .orElseGet(ViagemDependente::new);
@@ -356,7 +356,7 @@ public class SolicitacaoService {
         vinculo.setAtivo(true);
         viagemDependenteRepository.save(vinculo);
         viagemService.incluirDependenteEmExecucoesPlanejadas(
-                solicitacao.getViagem().getId(), solicitacao.getDependente().getId());
+                solicitacao.getViagem().getId(), solicitacao.getDependente().getId(), atorUsuarioId);
     }
 
     private void validarAlunoParaViagem(Viagem viagem, Dependente dependente) {
