@@ -10,4 +10,6 @@ public interface HistoricoOrdemParadaRepository extends JpaRepository<HistoricoO
 
     @EntityGraph(attributePaths = {"ator", "parada"})
     List<HistoricoOrdemParada> findByViagemDia_IdOrderByOcorridoEmAscIdAsc(Long viagemDiaId);
+
+    boolean existsByParadaId(Long paradaId);
 }

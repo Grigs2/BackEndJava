@@ -326,11 +326,11 @@ public class ViagemService {
                 continue;
             }
             viagem.getEscolas().removeIf(e -> escolaId.equals(e.getId()));
+            removerAlunosDaEscolaNasExecucoesPlanejadas(viagem.getId(), escolaId, hoje, ator);
             if (viagem.getEscolas().isEmpty()) {
                 desativarViagem(viagem.getId());
             } else {
                 viagemRepository.save(viagem);
-                removerAlunosDaEscolaNasExecucoesPlanejadas(viagem.getId(), escolaId, hoje, ator);
             }
         }
     }
@@ -357,9 +357,11 @@ public class ViagemService {
                     .removeIf(participante -> presencasRemovidas.contains(participante.getPresenca().getId())));
             ViagemParada primeira = paradas.get(0);
             ViagemParada ultima = paradas.get(paradas.size() - 1);
+            // Paradas com histórico de ordem são mantidas: o histórico referencia a parada e não pode ser reescrito.
             List<ViagemParada> vazias = paradas.stream()
                     .filter(parada -> parada.getParticipantes().isEmpty())
                     .filter(parada -> parada != primeira && parada != ultima)
+                    .filter(parada -> !historicoOrdemParadaRepository.existsByParadaId(parada.getId()))
                     .toList();
             viagemParadaRepository.deleteAll(vazias);
             viagemParadaRepository.flush();

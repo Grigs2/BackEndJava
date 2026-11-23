@@ -295,6 +295,7 @@ public class SolicitacaoService {
 
     private Solicitacao registrarResposta(Solicitacao solicitacao, boolean aceito, Long atorUsuarioId) {
         if (aceito) {
+            validarEscolaAindaAtendida(solicitacao.getViagem(), solicitacao.getDependente());
             validarPeriodoLivre(solicitacao);
         }
         solicitacao.setRespondido(true);
@@ -357,6 +358,17 @@ public class SolicitacaoService {
         viagemDependenteRepository.save(vinculo);
         viagemService.incluirDependenteEmExecucoesPlanejadas(
                 solicitacao.getViagem().getId(), solicitacao.getDependente().getId(), atorUsuarioId);
+    }
+
+    /** A escola pode ter sido removida do itinerário depois que a solicitação foi criada. */
+    private void validarEscolaAindaAtendida(Viagem viagem, Dependente dependente) {
+        if (viagem == null || dependente == null || dependente.getEscola() == null) {
+            return;
+        }
+        if (!viagem.getEscolas().isEmpty() && viagem.getEscolas().stream()
+                .noneMatch(e -> Objects.equals(e.getId(), dependente.getEscola().getId()))) {
+            throw new ConflictException("A escola do aluno não é mais atendida por esta viagem");
+        }
     }
 
     private void validarAlunoParaViagem(Viagem viagem, Dependente dependente) {
