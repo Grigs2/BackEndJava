@@ -41,7 +41,7 @@ Regras:
 - `escolaIds` é obrigatório e não pode ser vazio (validação `@NotEmpty`).
 - Não pode haver id repetido na lista.
 - A viagem precisa estar ativa.
-- Não pode existir execução de hoje já iniciada ou finalizada.
+- Não pode existir execução de hoje já iniciada ou finalizada: bloqueiam os status `EM_ANDAMENTO`, `FINALIZADA` e `INTERROMPIDA`. Execução de hoje `CANCELADA` não bloqueia.
 - Todas as escolas precisam ter vínculo ATIVO com o motorista.
 
 Resposta: `200` com o `ViagemDTO` atualizado.
@@ -108,6 +108,7 @@ Formato padrão (`ErrorResponseDTO`): `timestamp`, `status`, `error`, `message`,
 |---|---|
 | `400` | Lista de escolas vazia ou repetida, escola sem vínculo ativo, reordenação inválida, motivo acima de 500 caracteres. |
 | `404` | Viagem ou escola não encontrada. |
+| `403` | Usuário que não é dono da viagem tentando adicionar escolas ou alterar o itinerário. |
 | `409` | Viagem desativada, execução de hoje já iniciada, aceitação de aluno de escola removida. |
 
 ## 4. Fluxo sugerido no front

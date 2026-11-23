@@ -416,11 +416,13 @@ public class ViagemService {
         }
     }
 
-    /** Execução de hoje já iniciada ou finalizada: o itinerário não pode mais ser alterado. */
+    /** Execução de hoje já iniciada ou finalizada: o itinerário não pode mais ser alterado. Cancelada não bloqueia. */
     private void validarViagemNaoIniciadaHoje(Long idViagem) {
         LocalDate hoje = LocalDate.now(relogio);
         viagemDiaRepository.findByViagemIdAndData(idViagem, hoje)
-                .filter(dia -> dia.getStatus() != StatusViagemDia.PLANEJADA)
+                .filter(dia -> dia.getStatus() == StatusViagemDia.EM_ANDAMENTO
+                        || dia.getStatus() == StatusViagemDia.FINALIZADA
+                        || dia.getStatus() == StatusViagemDia.INTERROMPIDA)
                 .ifPresent(dia -> {
                     throw new ConflictException("A viagem de hoje já foi iniciada e não pode ser alterada");
                 });

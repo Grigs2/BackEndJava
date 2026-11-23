@@ -251,6 +251,28 @@ class ViagemRotaTest {
         verify(viagemRepository, never()).save(any());
     }
 
+    @Test
+    void cancelledExecutionOfTodayDoesNotBlockAddingSchool() {
+        ViagemDia execucao = execucao(StatusViagemDia.CANCELADA);
+        Viagem viagem = execucao.getViagem();
+        viagem.setId(70L);
+        viagem.setAtivo(true);
+        viagem.setEscolas(new ArrayList<>());
+        viagem.getMotorista().setId(200L);
+        when(viagemRepository.findByIdForUpdate(70L)).thenReturn(Optional.of(viagem));
+        when(viagemDiaRepository.findByViagemIdAndData(eq(70L), any(LocalDate.class)))
+                .thenReturn(Optional.of(execucao));
+        when(escolaRepository.findAllById(List.of(7L))).thenReturn(List.of(escola(7L)));
+        when(viagemEscolaRepository.listarIdsEscolasAtivasDoMotorista(
+                200L, List.of(7L), StatusVinculoEscola.ATIVO)).thenReturn(List.of(7L));
+        when(viagemRepository.save(viagem)).thenReturn(viagem);
+
+        service.adicionarEscolas(70L, List.of(7L));
+
+        assertEquals(1, viagem.getEscolas().size());
+        verify(viagemRepository).save(viagem);
+    }
+
     private Escola escola(Long id) {
         Escola escola = new Escola();
         escola.setId(id);
