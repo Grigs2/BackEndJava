@@ -386,6 +386,11 @@ public class ViagemService {
                     .filter(parada -> parada != primeira && parada != ultima)
                     .filter(parada -> !historicoOrdemParadaRepository.existsByParadaId(parada.getId()))
                     .toList();
+            paradas.stream()
+                    .filter(parada -> parada.getParticipantes().isEmpty())
+                    .filter(parada -> parada != primeira && parada != ultima)
+                    .filter(parada -> !vazias.contains(parada))
+                    .forEach(parada -> parada.setRemovidaPorEscola(true));
             viagemParadaRepository.deleteAll(vazias);
             viagemParadaRepository.flush();
 
@@ -885,25 +890,27 @@ public class ViagemService {
         if (paradasAtuais.isEmpty()) {
             throw new ConflictException("A execução ainda não possui uma rota materializada");
         }
-        Set<Long> idsAtuais = paradasAtuais.stream().map(ViagemParada::getId).collect(Collectors.toSet());
-        if (idsParadas.size() != idsAtuais.size()
+        // Paradas ocultas (escola removida) não são enviadas ao motorista: mantêm o seu slot na sequência.
+        List<ViagemParada> visiveis = paradasAtuais.stream().filter(parada -> !parada.isRemovidaPorEscola()).toList();
+        Set<Long> idsVisiveis = visiveis.stream().map(ViagemParada::getId).collect(Collectors.toSet());
+        if (idsParadas.size() != idsVisiveis.size()
                 || new HashSet<>(idsParadas).size() != idsParadas.size()
-                || !idsAtuais.equals(new HashSet<>(idsParadas))) {
+                || !idsVisiveis.equals(new HashSet<>(idsParadas))) {
             throw new BusinessException("A nova ordem deve conter cada parada existente exatamente uma vez");
         }
-        if (paradasAtuais.size() < 2
-                || paradasAtuais.get(0).getTipoParada() != TipoParada.MOTORISTA
-                || paradasAtuais.get(paradasAtuais.size() - 1).getTipoParada() != TipoParada.MOTORISTA
-                || !idsParadas.get(0).equals(paradasAtuais.get(0).getId())
-                || !idsParadas.get(idsParadas.size() - 1).equals(paradasAtuais.get(paradasAtuais.size() - 1).getId())) {
+        if (visiveis.size() < 2
+                || visiveis.get(0).getTipoParada() != TipoParada.MOTORISTA
+                || visiveis.get(visiveis.size() - 1).getTipoParada() != TipoParada.MOTORISTA
+                || !idsParadas.get(0).equals(visiveis.get(0).getId())
+                || !idsParadas.get(idsParadas.size() - 1).equals(visiveis.get(visiveis.size() - 1).getId())) {
             throw new BusinessException("As paradas inicial e final do motorista não podem ser reordenadas");
         }
 
         Map<Long, ViagemParada> paradasPorId = paradasAtuais.stream()
                 .collect(Collectors.toMap(ViagemParada::getId, parada -> parada));
         if (viagemDia.getStatus() == StatusViagemDia.EM_ANDAMENTO) {
-            for (int indice = 0; indice < paradasAtuais.size(); indice++) {
-                ViagemParada parada = paradasAtuais.get(indice);
+            for (int indice = 0; indice < visiveis.size(); indice++) {
+                ViagemParada parada = visiveis.get(indice);
                 if (paradaConcluida(parada)
                         && !parada.getId().equals(idsParadas.get(indice))) {
                     throw new BusinessException("Paradas já concluídas não podem ser reordenadas");
@@ -913,7 +920,13 @@ public class ViagemService {
 
         // Cada aluno precisa embarcar antes de desembarcar. Desembarque na escola adiantado para antes de alguns
         // embarques vira um desembarque extra nessa escola, no fim da rota (antes da casa do motorista).
-        List<ViagemParada> sequencia = new ArrayList<>(idsParadas.stream().map(paradasPorId::get).toList());
+        List<ViagemParada> sequencia = new ArrayList<>(paradasAtuais);
+        int proximaVisivel = 0;
+        for (int posicao = 0; posicao < sequencia.size(); posicao++) {
+            if (!sequencia.get(posicao).isRemovidaPorEscola()) {
+                sequencia.set(posicao, paradasPorId.get(idsParadas.get(proximaVisivel++)));
+            }
+        }
         List<ViagemParada> criadas = separarDesembarquesAntecipados(sequencia);
 
         List<HistoricoOrdemParada> historicos = new ArrayList<>();
@@ -1126,6 +1139,7 @@ public class ViagemService {
                                 (primeiro, segundo) -> primeiro));
 
         return paradas.stream()
+                .filter(parada -> !parada.isRemovidaPorEscola())
                 .map(parada -> new ParadaDTO(
                         parada.getId(),
                         parada.getOrdem(),

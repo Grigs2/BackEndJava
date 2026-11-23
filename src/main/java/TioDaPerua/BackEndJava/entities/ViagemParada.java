@@ -56,6 +56,10 @@ public class ViagemParada implements Serializable {
     @Column(name = "status_validacao_endereco", length = 20)
     private StatusValidacaoEndereco statusValidacaoEndereco;
 
+    /** Parada de escola removida do itinerário com histórico no dia: fica oculta, mas mantém sua ordem. */
+    @Column(name = "removida_por_escola", nullable = false, columnDefinition = "boolean not null default false")
+    private boolean removidaPorEscola;
+
     @OneToMany(mappedBy = "parada", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     @ToString.Exclude

@@ -77,6 +77,25 @@ class ViagemRotaTest {
     @InjectMocks private ViagemService service;
 
     @Test
+    void reorderingKeepsHiddenStopInItsSlotAndLeavesItUnchanged() {
+        ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
+        List<ViagemParada> paradas = paradas(execucao);
+        paradas.get(1).setRemovidaPorEscola(true);
+        when(viagemDiaRepository.findByIdForUpdate(90L)).thenReturn(Optional.of(execucao));
+        when(viagemParadaRepository.listarPorViagemDia(90L)).thenAnswer(invocation ->
+                paradas.stream().sorted(Comparator.comparingInt(ViagemParada::getOrdem)).toList());
+        when(usuarioRepository.findById(100L)).thenReturn(Optional.of(execucao.getViagem().getMotorista().getUsuario()));
+
+        service.reordenarParadas(90L, List.of(101L, 103L, 104L), 100L);
+
+        ArgumentCaptor<List<HistoricoOrdemParada>> captor = ArgumentCaptor.forClass(List.class);
+        verify(historicoOrdemParadaRepository).saveAll(captor.capture());
+        assertTrue(captor.getValue().isEmpty());
+        assertEquals(2, paradas.get(1).getOrdem());
+        assertEquals(3, paradas.get(2).getOrdem());
+    }
+
+    @Test
     void reordersOnlyExistingStopsAndPersistsAuditForChangedStops() {
         ViagemDia execucao = execucao(StatusViagemDia.PLANEJADA);
         List<ViagemParada> paradas = paradas(execucao);
@@ -171,6 +190,7 @@ class ViagemRotaTest {
         assertEquals(1, paradas.get(0).getOrdem());
         assertEquals(2, paradaComHistorico.getOrdem());
         assertEquals(3, paradas.get(3).getOrdem());
+        assertTrue(paradaComHistorico.isRemovidaPorEscola());
         assertTrue(viagem.getAtivo());
         assertEquals(List.of(escolaMantida), viagem.getEscolas());
         verify(viagemRepository).save(viagem);
