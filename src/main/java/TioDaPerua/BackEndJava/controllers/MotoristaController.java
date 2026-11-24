@@ -8,6 +8,8 @@ import TioDaPerua.BackEndJava.DTOs.SolicitarVinculoEscolaDTO;
 import TioDaPerua.BackEndJava.DTOs.UsuarioDTO;
 import TioDaPerua.BackEndJava.DTOs.VeiculoDTO;
 import TioDaPerua.BackEndJava.DTOs.DocumentoMotoristaDTO;
+import TioDaPerua.BackEndJava.DTOs.ConteudoImagemDocumentoDTO;
+import TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO;
 import TioDaPerua.BackEndJava.DTOs.VinculoEscolaDTO;
 import TioDaPerua.BackEndJava.DTOs.SubmeterDocumentoMotoristaDTO;
 import TioDaPerua.BackEndJava.entities.Motorista;
@@ -15,10 +17,14 @@ import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.services.MotoristaService;
 import TioDaPerua.BackEndJava.services.UsuarioService;
 import TioDaPerua.BackEndJava.services.DocumentoMotoristaService;
+import TioDaPerua.BackEndJava.services.ImagemDocumentoMotoristaService;
 import TioDaPerua.BackEndJava.services.VinculoEscolaService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -44,6 +50,9 @@ public class MotoristaController {
 
     @Autowired
     private DocumentoMotoristaService documentoMotoristaService;
+
+    @Autowired
+    private ImagemDocumentoMotoristaService imagemDocumentoService;
 
     @Autowired
     private VinculoEscolaService vinculoEscolaService;
@@ -100,6 +109,41 @@ public class MotoristaController {
             @Valid @RequestBody SubmeterDocumentoMotoristaDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(documentoMotoristaService.submeter(id_motorista, dto));
+    }
+
+    @GetMapping("/{id_motorista}/Documentos/{idDocumento}/Imagens")
+    @PreAuthorize("@resourceAuthorization.isMotorista(authentication, #p0)")
+    public ResponseEntity<List<ImagemDocumentoDTO>> listarImagensDocumento(
+            @PathVariable Long id_motorista, @PathVariable Long idDocumento) {
+        return ResponseEntity.ok(imagemDocumentoService.listar(id_motorista, idDocumento));
+    }
+
+    @PostMapping(value = "/{id_motorista}/Documentos/{idDocumento}/Imagens/{lado}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@resourceAuthorization.isMotorista(authentication, #p0)")
+    public ResponseEntity<ImagemDocumentoDTO> enviarImagemDocumento(
+            @PathVariable Long id_motorista,
+            @PathVariable Long idDocumento,
+            @PathVariable String lado,
+            @RequestPart(value = "arquivo", required = false) MultipartFile arquivo) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(imagemDocumentoService.enviar(id_motorista, idDocumento, lado, arquivo));
+    }
+
+    @GetMapping("/{id_motorista}/Documentos/{idDocumento}/Imagens/{lado}")
+    @PreAuthorize("@resourceAuthorization.isMotorista(authentication, #p0)")
+    public ResponseEntity<byte[]> consultarImagemDocumento(
+            @PathVariable Long id_motorista,
+            @PathVariable Long idDocumento,
+            @PathVariable String lado) {
+        ConteudoImagemDocumentoDTO imagem = imagemDocumentoService.ler(id_motorista, idDocumento, lado);
+        return respostaImagem(imagem);
+    }
+
+    private ResponseEntity<byte[]> respostaImagem(ConteudoImagemDocumentoDTO imagem) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(imagem.mimeType()))
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .body(imagem.conteudo());
     }
 
     @PutMapping("/AlterarInfos")

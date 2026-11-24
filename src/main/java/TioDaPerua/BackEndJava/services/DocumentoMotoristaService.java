@@ -1,6 +1,7 @@
 package TioDaPerua.BackEndJava.services;
 
 import TioDaPerua.BackEndJava.DTOs.DocumentoMotoristaDTO;
+import TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO;
 import TioDaPerua.BackEndJava.DTOs.RevisarDocumentoDTO;
 import TioDaPerua.BackEndJava.DTOs.SubmeterDocumentoMotoristaDTO;
 import TioDaPerua.BackEndJava.entities.Administrador;
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class DocumentoMotoristaService {
@@ -33,16 +35,19 @@ public class DocumentoMotoristaService {
     private final DocumentoMotoristaRepository documentoRepository;
     private final MotoristaRepository motoristaRepository;
     private final AdministradorRepository administradorRepository;
+    private final ImagemDocumentoMotoristaService imagemService;
 
     @Autowired
     private AuditoriaAdministrativaService auditoriaService;
 
     public DocumentoMotoristaService(DocumentoMotoristaRepository documentoRepository,
                                      MotoristaRepository motoristaRepository,
-                                     AdministradorRepository administradorRepository) {
+                                     AdministradorRepository administradorRepository,
+                                     ImagemDocumentoMotoristaService imagemService) {
         this.documentoRepository = documentoRepository;
         this.motoristaRepository = motoristaRepository;
         this.administradorRepository = administradorRepository;
+        this.imagemService = imagemService;
     }
 
     @Transactional
@@ -60,6 +65,7 @@ public class DocumentoMotoristaService {
                 .ifPresent(anterior -> {
                     anterior.setSubstituidoEm(Instant.now());
                     documentoRepository.save(anterior);
+                    imagemService.excluirDoDocumento(anterior.getId());
                 });
         documento.setMotorista(motorista);
         documento.setTipo(dto.tipo());
@@ -100,10 +106,16 @@ public class DocumentoMotoristaService {
     /** Fila de revisão com motorista, veículo e conferências automáticas (mais antigos primeiro). */
     @Transactional(readOnly = true)
     public List<TioDaPerua.BackEndJava.DTOs.DocumentoRevisaoDTO> listarParaRevisao() {
-        return documentoRepository.findByStatusAndSubstituidoEmIsNullOrderBySubmetidoEmAsc(StatusDocumento.PENDENTE).stream()
-                .map(ConferenciaDocumentoService::paraRevisao)
+        List<DocumentoMotorista> pendentes =
+                documentoRepository.findByStatusAndSubstituidoEmIsNullOrderBySubmetidoEmAsc(StatusDocumento.PENDENTE);
+        Map<Long, List<ImagemDocumentoDTO>> imagensPorDocumento = imagemService.listarPorDocumentos(
+                pendentes.stream().map(DocumentoMotorista::getId).toList());
+        return pendentes.stream()
+                .map(documento -> ConferenciaDocumentoService.paraRevisao(
+                        documento, imagensPorDocumento.getOrDefault(documento.getId(), List.of())))
                 .toList();
     }
+
 
     @Transactional
     public DocumentoMotoristaDTO revisar(Long administradorUsuarioId, Long documentoId, RevisarDocumentoDTO dto) {
@@ -140,6 +152,9 @@ public class DocumentoMotoristaService {
             throw new BusinessException("Não é possível aprovar documento vencido ou sem validade");
         }
 
+        if (dto.status() == StatusDocumento.APROVADO) {
+            imagemService.exigirImagensObrigatorias(documentoId, documento.getTipo());
+        }
         documento.setStatus(dto.status());
         documento.setMotivoRecusa(dto.status() == StatusDocumento.RECUSADO ? motivo : null);
         documento.setRevisadoEm(Instant.now());

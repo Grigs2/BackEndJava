@@ -31,6 +31,7 @@ class DocumentoMotoristaServiceTest {
     @Mock private MotoristaRepository motoristaRepository;
     @Mock private AdministradorRepository administradorRepository;
     @Mock private AuditoriaAdministrativaService auditoriaService;
+    @Mock private ImagemDocumentoMotoristaService imagemService;
     @InjectMocks private DocumentoMotoristaService service;
 
     @Test

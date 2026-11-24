@@ -35,6 +35,9 @@ build/
 ### Credenciais de teste geradas pelo seed ###
 scripts/seed-perfis-teste/credenciais.txt
 
+# Arquivos de imagens de documentos (armazenamento local padrao)
+storage/
+
 # Python (scripts de seed)
 __pycache__/
 *.pyc

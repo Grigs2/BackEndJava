@@ -3,6 +3,7 @@ package TioDaPerua.BackEndJava.services;
 import TioDaPerua.BackEndJava.DTOs.ConferenciaDocumentoDTO;
 import TioDaPerua.BackEndJava.DTOs.DocumentoMotoristaDTO;
 import TioDaPerua.BackEndJava.DTOs.DocumentoRevisaoDTO;
+import TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO;
 import TioDaPerua.BackEndJava.config.DataBrasilia;
 import TioDaPerua.BackEndJava.entities.DocumentoMotorista;
 import TioDaPerua.BackEndJava.entities.Motorista;
@@ -35,7 +36,7 @@ public final class ConferenciaDocumentoService {
     private ConferenciaDocumentoService() {
     }
 
-    public static DocumentoRevisaoDTO paraRevisao(DocumentoMotorista documento) {
+    public static DocumentoRevisaoDTO paraRevisao(DocumentoMotorista documento, List<ImagemDocumentoDTO> imagens) {
         LocalDate hoje = DataBrasilia.hoje();
         Motorista motorista = documento.getMotorista();
         Veiculo veiculo = documento.getVeiculo() != null ? documento.getVeiculo()
@@ -52,7 +53,8 @@ public final class ConferenciaDocumentoService {
                 veiculo == null ? null : veiculo.getPlaca(),
                 veiculo == null ? null : veiculo.getModelo(),
                 conferencias,
-                podeAprovar);
+                podeAprovar,
+                imagens);
     }
 
     static List<ConferenciaDocumentoDTO> conferir(DocumentoMotorista documento, Motorista motorista,
