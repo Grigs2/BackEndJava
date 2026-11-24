@@ -12,7 +12,7 @@
       "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline",
+  "postCreateCommand": "sudo mkdir -p /var/lib/tiodaperua/documentos && sudo chown -R vscode:vscode /var/lib/tiodaperua && chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline",
   "customizations": {
     "vscode": {
       "extensions": ["vscjava.vscode-java-pack"]

@@ -143,7 +143,7 @@ O cadastro de motorista exige idade mínima de 18 anos completos, CPF válido e 
 
 ### Documentos do motorista
 
-Os documentos são metadados, sem upload de arquivos. Cada envio cria uma nova submissão e preserva o histórico anterior:
+Os documentos são metadados e, opcionalmente, imagens. Cada envio cria uma nova submissão e preserva o histórico anterior:
 
 `POST /Motorista/{id_motorista}/Documentos` — somente o próprio motorista.
 
@@ -161,6 +161,19 @@ Exemplo de envio de CNH:
 Para vistoria, envie `tipo: "VISTORIA"`, `dataRealizacao` e `dataValidade`; para licenciamento, envie `tipo: "LICENCIAMENTO"`, o RENAVAM completo com 11 dígitos no campo `numero` e `dataValidade`. O número da CNH também deve ter 11 dígitos. Vistoria e licenciamento são vinculados ao veículo atual do motorista. A resposta informa `PENDENTE`, `APROVADO`, `RECUSADO` ou `VENCIDO` (derivado da validade de documento aprovado).
 
 `GET /Motorista/{id_motorista}/Documentos` retorna o histórico do próprio motorista. O ADMIN consulta a fila pendente em `GET /Admin/Documentos/Pendentes` e decide em `PUT /Admin/Documentos/{idDocumento}/Revisar`, enviando `{"status":"APROVADO"}` ou `{"status":"RECUSADO","motivoRecusa":"..."}`. O motivo de recusa é opcional. Apenas a submissão mais recente daquele tipo pode ser revisada; registros anteriores permanecem no histórico. O campo legado `Motorista.cnh` é atualizado somente depois da aprovação da nova CNH.
+
+#### Imagens dos documentos
+
+Lados aceitos: `FRENTE` e `VERSO` para CNH e LICENCIAMENTO; `UNICA` para VISTORIA. Formatos aceitos: JPEG e PNG (validados pelo conteúdo, não só pela extensão). Limite de 1 MB por arquivo e 2 MB por requisição.
+
+- `POST /Motorista/{id_motorista}/Documentos/{idDocumento}/Imagens/{lado}` — multipart com o campo `arquivo`. Retorna `201` com `{documentoId, lado, mimeType, tamanhoBytes, enviadoEm}`. Reenviar o mesmo lado substitui a imagem anterior. Só é permitido enquanto o documento está `PENDENTE` ou `RECUSADO`.
+- `GET /Motorista/{id_motorista}/Documentos/{idDocumento}/Imagens` — lista os metadados das imagens do documento.
+- `GET /Motorista/{id_motorista}/Documentos/{idDocumento}/Imagens/{lado}` — devolve os bytes da imagem com o `Content-Type` correspondente e `Cache-Control: private, no-store`.
+- `GET /Admin/Documentos/{idDocumento}/Imagens/{lado}` — o ADMIN visualiza a imagem. Cada visualização é registrada na auditoria (`IMAGEM_DOCUMENTO_VISUALIZADA`).
+
+Erros: `400` lado inválido ou não aplicável ao tipo; `403` documento de outro motorista; `409` documento substituído, já aprovado ou aprovação sem as imagens obrigatórias; `413` arquivo acima de 1 MB; `415` formato diferente de JPEG/PNG.
+
+Ao substituir a submissão por uma nova, as imagens anteriores são removidas do armazenamento. A fila de revisão com contexto (`GET /Admin/Documentos/Revisao`) inclui, em cada item, o campo `imagens` com os metadados das imagens do documento. A fila simples `GET /Admin/Documentos/Pendentes` não muda. A aprovação (`APROVADO`) exige todas as imagens obrigatórias do tipo. A recusa não exige imagens.As imagens ficam em disco no diretório configurado por `APP_STORAGE_DOCUMENTOS_DIR` (padrão local `./storage/documentos`, ignorado pelo git). No Codespace, o `.devcontainer` monta o volume Docker `documentos_motorista` em `/var/lib/tiodaperua/documentos`, fora do repositório, então as imagens não aparecem no workspace nem no git e sobrevivem a rebuilds do container. A retenção de 30 dias após a mudança de status do motorista ainda não está implementada.
 
 O planejamento continua permitido sem a documentação aprovada. A mudança da execução para `EM_ANDAMENTO` só ocorre se a CNH, a vistoria e o licenciamento mais recentes estiverem aprovados, dentro da validade e associados ao veículo atual.
 
@@ -245,7 +258,11 @@ Consultas e alterações administrativas são auditadas com ator, ação, alvo, 
 | Atualizar veículo | `PUT /Motorista/{id}/Veiculo` | MotoristaController |
 | Listar documentos do motorista | `GET /Motorista/{id}/Documentos` | MotoristaController |
 | Enviar documento do motorista | `POST /Motorista/{id}/Documentos` | MotoristaController |
+| Enviar imagem do documento | `POST /Motorista/{id}/Documentos/{idDocumento}/Imagens/{lado}` | MotoristaController |
+| Listar imagens do documento | `GET /Motorista/{id}/Documentos/{idDocumento}/Imagens` | MotoristaController |
+| Baixar imagem do documento | `GET /Motorista/{id}/Documentos/{idDocumento}/Imagens/{lado}` | MotoristaController |
 | Fila de revisão documental | `GET /Admin/Documentos/Pendentes` | AdministradorController |
+| Visualizar imagem (admin) | `GET /Admin/Documentos/{idDocumento}/Imagens/{lado}` | AdministradorController |
 | Revisar documento | `PUT /Admin/Documentos/{idDocumento}/Revisar` | AdministradorController |
 | Pesquisar usuários/escolas/vínculos | `GET /Admin/Usuarios`, `/Escolas`, `/Vinculos/MotoristaEscola` ou `/Vinculos/ResponsavelDependente` | AdministradorController |
 | Consultar auditoria administrativa | `GET /Admin/Auditoria` | AdministradorController |

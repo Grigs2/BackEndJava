@@ -3,6 +3,7 @@ package TioDaPerua.BackEndJava.handlers;
 import TioDaPerua.BackEndJava.DTOs.ErrorResponseDTO;
 import TioDaPerua.BackEndJava.exceptions.BusinessException;
 import TioDaPerua.BackEndJava.exceptions.ConflictException;
+import TioDaPerua.BackEndJava.exceptions.FormatoArquivoNaoPermitidoException;
 import TioDaPerua.BackEndJava.exceptions.ResourceNotFoundException;
 import TioDaPerua.BackEndJava.exceptions.ServiceUnavailableException;
 import TioDaPerua.BackEndJava.exceptions.UnauthorizedException;
@@ -14,6 +15,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import TioDaPerua.BackEndJava.config.DataBrasilia;
 import java.time.LocalDateTime;
@@ -88,6 +90,19 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException ex, HttpServletRequest request) {
         return createResponse(HttpStatus.BAD_REQUEST, "Bad Request",
                 "O corpo da requisição está ausente ou em formato inválido", request);
+    }
+
+    @ExceptionHandler(FormatoArquivoNaoPermitidoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleFormatoNaoPermitido(
+            FormatoArquivoNaoPermitidoException ex, HttpServletRequest request) {
+        return createResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleArquivoGrande(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return createResponse(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large",
+                "O arquivo excede o tamanho máximo permitido", request);
     }
 
     @ExceptionHandler(Exception.class)

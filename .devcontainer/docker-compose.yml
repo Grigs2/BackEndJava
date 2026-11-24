@@ -1,8 +1,6 @@
 services:
   app:
     image: mcr.microsoft.com/devcontainers/java:1-21
-    volumes:
-      - ..:/workspaces/BackEndJava:cached
     command: sleep infinity
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/TioDaPerua
@@ -16,6 +14,10 @@ services:
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
       DOCS_ENABLED: ${DOCS_ENABLED:-true}
       CORS_ALLOWED_ORIGIN_PATTERNS: https://*.app.github.dev,http://localhost:8081,http://localhost:3000
+      APP_STORAGE_DOCUMENTOS_DIR: /var/lib/tiodaperua/documentos
+    volumes:
+      - ..:/workspaces/BackEndJava:cached
+      - documentos_motorista:/var/lib/tiodaperua/documentos
 
   db:
     image: postgres:16
@@ -29,3 +31,4 @@ services:
 
 volumes:
   pgdata:
+  documentos_motorista:

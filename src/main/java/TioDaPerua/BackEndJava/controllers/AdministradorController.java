@@ -11,12 +11,16 @@ import TioDaPerua.BackEndJava.DTOs.AdminSuspenderContaDTO;
 import TioDaPerua.BackEndJava.DTOs.AdminUsuarioResumoDTO;
 import TioDaPerua.BackEndJava.DTOs.AdminVinculoMotoristaEscolaDTO;
 import TioDaPerua.BackEndJava.DTOs.AdminVinculoResponsavelDTO;
+import TioDaPerua.BackEndJava.DTOs.ConteudoImagemDocumentoDTO;
 import TioDaPerua.BackEndJava.enums.StatusVinculoEscola;
 import TioDaPerua.BackEndJava.services.AdminGestaoService;
 import TioDaPerua.BackEndJava.services.AuditoriaAdministrativaService;
 import TioDaPerua.BackEndJava.services.DocumentoMotoristaService;
+import TioDaPerua.BackEndJava.services.ImagemDocumentoMotoristaService;
 import TioDaPerua.BackEndJava.services.RedeResponsaveisService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,15 +48,18 @@ public class AdministradorController {
     private final RedeResponsaveisService redeResponsaveisService;
     private final AdminGestaoService adminGestaoService;
     private final AuditoriaAdministrativaService auditoriaService;
+    private final ImagemDocumentoMotoristaService imagemDocumentoService;
 
     public AdministradorController(DocumentoMotoristaService documentoMotoristaService,
                                    RedeResponsaveisService redeResponsaveisService,
                                    AdminGestaoService adminGestaoService,
-                                   AuditoriaAdministrativaService auditoriaService) {
+                                   AuditoriaAdministrativaService auditoriaService,
+                                   ImagemDocumentoMotoristaService imagemDocumentoService) {
         this.documentoMotoristaService = documentoMotoristaService;
         this.redeResponsaveisService = redeResponsaveisService;
         this.adminGestaoService = adminGestaoService;
         this.auditoriaService = auditoriaService;
+        this.imagemDocumentoService = imagemDocumentoService;
     }
 
     @GetMapping("/Documentos/Pendentes")
@@ -81,6 +88,21 @@ public class AdministradorController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(documentoMotoristaService.revisar(
                 Long.valueOf(jwt.getSubject()), idDocumento, dto));
+    }
+
+    @GetMapping("/Documentos/{idDocumento}/Imagens/{lado}")
+    public ResponseEntity<byte[]> consultarImagemDocumento(
+            @PathVariable Long idDocumento,
+            @PathVariable String lado,
+            @AuthenticationPrincipal Jwt jwt) {
+        ConteudoImagemDocumentoDTO imagem = imagemDocumentoService.ler(null, idDocumento, lado);
+        auditoriaService.registrarAlteracao(
+                Long.valueOf(jwt.getSubject()), "IMAGEM_DOCUMENTO_VISUALIZADA", "DOCUMENTO_MOTORISTA",
+                idDocumento, "SUCESSO", lado.toUpperCase());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(imagem.mimeType()))
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .body(imagem.conteudo());
     }
 
     @GetMapping("/Dependentes/ResponsavelCriadorPendentes")
