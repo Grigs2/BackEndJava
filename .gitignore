@@ -38,6 +38,9 @@ scripts/seed-perfis-teste/credenciais.txt
 # Arquivos de imagens de documentos (armazenamento local padrao)
 storage/
 
+# Pasta de transferencia de imagens do volume do Codespace para visualizacao (ver Docs/TRANSFERIR_IMAGENS_PARA_O_REPO.md)
+.imagens-transferencia/
+
 # Python (scripts de seed)
 __pycache__/
 *.pyc
