@@ -1,16 +1,17 @@
 package TioDaPerua.BackEndJava.config;
 
-import TioDaPerua.BackEndJava.entities.Usuario;
 import TioDaPerua.BackEndJava.enums.StatusConviteResponsavel;
 import TioDaPerua.BackEndJava.repositories.AuditoriaAdministrativaRepository;
 import TioDaPerua.BackEndJava.repositories.EscolaRepository;
 import TioDaPerua.BackEndJava.repositories.ResponsavelRepository;
 import TioDaPerua.BackEndJava.repositories.UsuarioRepository;
 import TioDaPerua.BackEndJava.repositories.ViagemEscolaRepository;
+import TioDaPerua.BackEndJava.services.AuditoriaAdministrativaService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -42,6 +43,7 @@ class SecurityAuthorizationIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtEncoder jwtEncoder;
+    @MockitoBean private AuditoriaAdministrativaService auditoriaAdministrativaService;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private EscolaRepository escolaRepository;
     @Autowired private ViagemEscolaRepository viagemEscolaRepository;
@@ -109,15 +111,8 @@ class SecurityAuthorizationIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
 
-        Usuario administrador = usuarioRepository.save(new Usuario(
-                "security-test-" + java.util.UUID.randomUUID() + "@example.com",
-                "test-password",
-                "Endereco de teste",
-                "11999999999",
-                "ADMIN"));
         mockMvc.perform(get("/Admin/Documentos/Pendentes")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer "
-                                + token(administrador.getId().toString(), "ADMIN")))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token("1", "ADMIN")))
                 .andExpect(status().isOk());
     }
 
