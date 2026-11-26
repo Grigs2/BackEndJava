@@ -147,5 +147,6 @@ Sugestão para o front: validar tamanho (1 MB) e tipo (`image/jpeg` ou `image/pn
 
 ## 7. Pendências conhecidas
 
-- Retenção: 30 dias após a suspensão da conta, as imagens são apagadas pelo job diário e os documentos afetados voltam para `RECUSADO` com o motivo de reenvio. Reativar antes disso mantém as imagens. Após a purga, o motorista precisa reenviar as imagens antes de iniciar viagens.
+- Retenção: 30 dias após a suspensão da conta, as imagens são apagadas pelo job diário e os documentos afetados voltam para `RECUSADO` com o motivo de reenvio. Reativar antes disso mantém as imagens. O motivo gravado na recusa é "Imagens removidas após 30 dias de suspensão da conta. Reenvie o documento.".
+- Início de viagem: documentos pendentes, recusados ou vencidos não bloqueiam o início. Eles aparecem como aviso em `GET /Viagem/Prontidao/{idViagem}` (campo `avisos`, com `pronta: true` quando não há bloqueios). O front deve exibir esse aviso para o motorista regularizar o documento.
 - Limite no proxy: o nginx de produção precisa de `client_max_body_size 2m` (fora deste repositório).
