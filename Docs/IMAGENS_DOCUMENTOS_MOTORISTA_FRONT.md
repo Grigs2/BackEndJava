@@ -65,7 +65,14 @@ Não defina o `Content-Type` manualmente: o navegador precisa colocar o `boundar
 
 `GET /Motorista/{id_motorista}/Documentos/{idDocumento}/Imagens`
 
-Resposta `200 OK`: lista de objetos com o mesmo formato do item de 3.1. Lista vazia se não houver imagens.
+Resposta `200 OK`: lista de objetos com o mesmo formato do item de 3.1. Lista vazia se não houver imagens (isso é o único caso de "nenhuma imagem enviada").
+
+Erros desta listagem:
+
+- `401`: token ausente ou expirado.
+- `403`: documento de outro motorista, ou token de outro usuário. Não é "sem imagens".
+- `404`: documento não existe.
+- Não há `409` nesta rota. A listagem funciona em qualquer status, inclusive `APROVADO`, `VENCIDO` ou substituído.
 
 ### 3.3 Baixar imagem
 
@@ -133,7 +140,7 @@ Formato padrão de erro do backend. Os códigos relevantes para as imagens:
 | 401 | Token ausente ou expirado. |
 | 403 | Documento de outro motorista, ou usuário sem perfil para a rota. |
 | 404 | Documento ou imagem não encontrada. |
-| 409 | Documento está `APROVADO` ou `VENCIDO`, ou é uma submissão substituída. Aprovação sem as imagens obrigatórias. |
+| 409 | Envio de imagem (POST) em documento `APROVADO`, `VENCIDO` ou substituído. Aprovação (PUT revisar) sem as imagens obrigatórias. A listagem (GET) nunca retorna 409. |
 | 413 | Arquivo acima de 1 MB, ou requisição acima de 2 MB. |
 | 415 | Formato diferente de JPEG ou PNG. |
 
