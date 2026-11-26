@@ -58,6 +58,11 @@ public class MotoristaService {
         }
         validarIdadeMinima(motorista.getDataNascimento());
         motorista.setCpf(validarCpf(motorista.getCpf()));
+        if (motorista.getCnh() != null && !motorista.getCnh().isBlank()) {
+            if (!ConferenciaDocumentoService.cnhValida(motorista.getCnh())) {
+                throw new BusinessException("Número da CNH inválido: os dígitos verificadores não conferem");
+            }
+        }
         cadastroUsuarioValidator.validarNovoCadastro(motorista.getUsuario());
         SenhaPolicy.exigirValida(motorista.getUsuario().getSenha());
         termosService.registrarAceite(motorista.getUsuario(),

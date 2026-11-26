@@ -44,7 +44,9 @@ public final class ConferenciaDocumentoService {
         Integer idade = motorista == null || motorista.getDataNascimento() == null ? null
                 : Period.between(motorista.getDataNascimento(), hoje).getYears();
         List<ConferenciaDocumentoDTO> conferencias = conferir(documento, motorista, idade, hoje);
-        boolean podeAprovar = conferencias.stream().noneMatch(c -> "ERRO".equals(c.situacao()));
+        // A aprovação também exige as imagens obrigatórias (mesma regra de ImagemDocumentoMotoristaService).
+        boolean imagensCompletas = imagensObrigatoriasEnviadas(documento.getTipo(), imagens);
+        boolean podeAprovar = imagensCompletas && conferencias.stream().noneMatch(c -> "ERRO".equals(c.situacao()));
         return new DocumentoRevisaoDTO(
                 DocumentoMotoristaDTO.toDTO(documento),
                 motorista == null ? null : motorista.getId(),
@@ -55,6 +57,14 @@ public final class ConferenciaDocumentoService {
                 conferencias,
                 podeAprovar,
                 imagens);
+    }
+
+    /** CNH e licenciamento exigem frente e verso; vistoria exige uma foto. */
+    static boolean imagensObrigatoriasEnviadas(TipoDocumento tipo, List<ImagemDocumentoDTO> imagens) {
+        if (tipo == null) return false;
+        List<TioDaPerua.BackEndJava.enums.LadoDocumento> enviados = imagens == null ? List.of()
+                : imagens.stream().map(ImagemDocumentoDTO::lado).toList();
+        return enviados.containsAll(TioDaPerua.BackEndJava.enums.LadoDocumento.aceitosPara(tipo));
     }
 
     static List<ConferenciaDocumentoDTO> conferir(DocumentoMotorista documento, Motorista motorista,

@@ -22,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -90,6 +91,35 @@ class DocumentoMotoristaServiceTest {
     void requiresFullDocumentNumbersForCnhAndLicensing() {
         assertThrows(BusinessException.class, () -> service.submeter(20L,
                 new SubmeterDocumentoMotoristaDTO(TipoDocumento.CNH, "1234", "D", null,
+                        LocalDate.now().plusDays(100))));
+    }
+
+    @Test
+    void rejectsCnhWhoseCheckDigitsDoNotMatch() {
+        BusinessException erro = assertThrows(BusinessException.class, () -> service.submeter(20L,
+                new SubmeterDocumentoMotoristaDTO(TipoDocumento.CNH, "04512387612", "D", null,
+                        LocalDate.now().plusDays(100))));
+        assertTrue(erro.getMessage().contains("dígitos verificadores"));
+    }
+
+    @Test
+    void rejectsRenavamWhoseCheckDigitDoesNotMatch() {
+        BusinessException erro = assertThrows(BusinessException.class, () -> service.submeter(20L,
+                new SubmeterDocumentoMotoristaDTO(TipoDocumento.LICENCIAMENTO, "01234567890", null, null,
+                        LocalDate.now().plusDays(100))));
+        assertTrue(erro.getMessage().contains("dígito verificador"));
+    }
+
+    @Test
+    void acceptsCnhWithValidCheckDigits() {
+        when(motoristaRepository.findById(20L)).thenReturn(Optional.of(motoristaComVeiculo()));
+        when(documentoRepository.findFirstByMotoristaIdAndTipoOrderByIdDesc(20L, TipoDocumento.CNH))
+                .thenReturn(Optional.empty());
+        when(documentoRepository.save(org.mockito.ArgumentMatchers.any(DocumentoMotorista.class)))
+                .thenAnswer(invocacao -> invocacao.getArgument(0));
+
+        assertDoesNotThrow(() -> service.submeter(20L,
+                new SubmeterDocumentoMotoristaDTO(TipoDocumento.CNH, "12345678900", "D", null,
                         LocalDate.now().plusDays(100))));
     }
 

@@ -60,11 +60,16 @@ public class MotoristaController {
     @Autowired
     private TioDaPerua.BackEndJava.services.SolicitacaoService solicitacaoService;
 
-    /** Solicitações sem resposta das viagens do motorista: convites enviados e pedidos de vaga recebidos. */
+    /**
+     * Solicitações das viagens do motorista. Sem parâmetro, só as sem resposta (convites enviados e pedidos de vaga);
+     * com {@code todas=true}, também os vínculos ativos e os encerrados.
+     */
     @GetMapping("/{idMotorista}/Solicitacoes")
     @PreAuthorize("#p0 != null && @resourceAuthorization.isMotorista(authentication, #p0)")
-    public ResponseEntity<List<TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO>> listarSolicitacoes(@PathVariable Long idMotorista) {
-        return ResponseEntity.ok(solicitacaoService.listarDoMotorista(idMotorista).stream()
+    public ResponseEntity<List<TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO>> listarSolicitacoes(
+            @PathVariable Long idMotorista,
+            @RequestParam(name = "todas", defaultValue = "false") boolean todas) {
+        return ResponseEntity.ok(solicitacaoService.listarDoMotorista(idMotorista, todas).stream()
                 .map(TioDaPerua.BackEndJava.DTOs.SolicitacaoDTO::toDTO)
                 .toList());
     }
