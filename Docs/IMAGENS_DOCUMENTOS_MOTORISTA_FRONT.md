@@ -65,7 +65,14 @@ Não defina o `Content-Type` manualmente: o navegador precisa colocar o `boundar
 
 `GET /Motorista/{id_motorista}/Documentos/{idDocumento}/Imagens`
 
-Resposta `200 OK`: lista de objetos com o mesmo formato do item de 3.1. Lista vazia se não houver imagens.
+Resposta `200 OK`: lista de objetos com o mesmo formato do item de 3.1. Lista vazia se não houver imagens (isso é o único caso de "nenhuma imagem enviada").
+
+Erros desta listagem:
+
+- `401`: token ausente ou expirado.
+- `403`: documento de outro motorista, ou token de outro usuário. Não é "sem imagens".
+- `404`: documento não existe.
+- Não há `409` nesta rota. A listagem funciona em qualquer status, inclusive `APROVADO`, `VENCIDO` ou substituído.
 
 ### 3.3 Baixar imagem
 
@@ -106,6 +113,8 @@ Resposta `200 OK`: lista de `DocumentoRevisaoDTO`. Cada item inclui o novo campo
 }
 ```
 
+`podeAprovar` é `true` somente quando todos os lados obrigatórios do tipo estão enviados e não há conferência com erro. Se faltar algum lado, ou houver conferência `ERRO`, retorna `false`.
+
 `imagens` pode vir vazio. A fila simples `GET /Admin/Documentos/Pendentes` não mudou e não traz imagens.
 
 ### 4.2 Visualizar imagem
@@ -131,7 +140,7 @@ Formato padrão de erro do backend. Os códigos relevantes para as imagens:
 | 401 | Token ausente ou expirado. |
 | 403 | Documento de outro motorista, ou usuário sem perfil para a rota. |
 | 404 | Documento ou imagem não encontrada. |
-| 409 | Documento está `APROVADO` ou `VENCIDO`, ou é uma submissão substituída. Aprovação sem as imagens obrigatórias. |
+| 409 | Envio de imagem (POST) em documento `APROVADO`, `VENCIDO` ou substituído. Aprovação (PUT revisar) sem as imagens obrigatórias. A listagem (GET) nunca retorna 409. |
 | 413 | Arquivo acima de 1 MB, ou requisição acima de 2 MB. |
 | 415 | Formato diferente de JPEG ou PNG. |
 
@@ -147,5 +156,7 @@ Sugestão para o front: validar tamanho (1 MB) e tipo (`image/jpeg` ou `image/pn
 
 ## 7. Pendências conhecidas
 
-- Retenção: as imagens serão apagadas 30 dias após a mudança de status do motorista. Isso ainda não está implementado.
+- Retenção: 30 dias após a suspensão da conta, as imagens são apagadas pelo job diário e os documentos afetados voltam para `RECUSADO` com o motivo de reenvio. Reativar antes disso mantém as imagens. O motivo gravado na recusa é "Imagens removidas após 30 dias de suspensão da conta. Reenvie o documento.".
+- Início de viagem: documentos pendentes, recusados ou vencidos não bloqueiam o início. Eles aparecem como aviso em `GET /Viagem/Prontidao/{idViagem}` (campo `avisos`, com `pronta: true` quando não há bloqueios). O front deve exibir esse aviso para o motorista regularizar o documento. Não há código de erro nem `message` de bloqueio para esse caso, porque o início não é recusado.
+- Como a viagem não é bloqueada, o aviso em `avisos` é o único sinal do problema na tela de início. O status detalhado (`RECUSADO`, `motivoRecusa`) continua disponível nos endpoints de documentos do motorista.
 - Limite no proxy: o nginx de produção precisa de `client_max_body_size 2m` (fora deste repositório).

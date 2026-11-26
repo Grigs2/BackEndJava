@@ -7,6 +7,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       JWT_SECRET_BASE64: ${JWT_SECRET_BASE64:?defina o secret JWT_SECRET_BASE64 no Codespaces}
+      DOCUMENTOS_CHAVE_BASE64: ${DOCUMENTOS_CHAVE_BASE64:?defina o secret DOCUMENTOS_CHAVE_BASE64 (32 bytes em Base64) no Codespaces}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?defina o secret ADMIN_EMAIL no Codespaces}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina o secret ADMIN_PASSWORD no Codespaces}
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}

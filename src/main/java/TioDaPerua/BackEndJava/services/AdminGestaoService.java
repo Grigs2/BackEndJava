@@ -169,6 +169,7 @@ public class AdminGestaoService {
         }
 
         usuario.setContaSuspensa(true);
+        usuario.setContaSuspensaEm(Instant.now());
         usuarioRepository.save(usuario);
         refreshTokenRepository.revogarSessoesDoUsuario(usuarioId, jwtTokenService.now());
         auditoriaService.registrarAlteracao(
@@ -189,6 +190,7 @@ public class AdminGestaoService {
             throw new ConflictException("A conta não está suspensa");
         }
         usuario.setContaSuspensa(false);
+        usuario.setContaSuspensaEm(null);
         usuarioRepository.save(usuario);
         auditoriaService.registrarAlteracao(
                 atorId, "USUARIO_REATIVADO", "USUARIO", usuarioId, "SUCESSO",

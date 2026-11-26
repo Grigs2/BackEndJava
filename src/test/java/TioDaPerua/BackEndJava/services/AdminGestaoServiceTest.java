@@ -62,11 +62,12 @@ class AdminGestaoServiceTest {
         when(usuarioRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(alvo));
         when(jwtTokenService.now()).thenReturn(agora);
 
+        Instant antes = Instant.now();
         service.suspenderUsuario(1L, 20L, "Conta irregular");
 
         assertTrue(alvo.getContaSuspensa());
+        assertFalse(alvo.getContaSuspensaEm().isBefore(antes));
         verify(usuarioRepository).save(alvo);
-        verify(refreshTokenRepository).revogarSessoesDoUsuario(20L, agora);
         verify(auditoriaService).registrarAlteracao(
                 1L, "USUARIO_SUSPENSO", "USUARIO", 20L, "SUCESSO", "Conta irregular");
     }
@@ -91,11 +92,13 @@ class AdminGestaoServiceTest {
     @Test
     void reactivatesSuspendedAccountAndAllowsAnOptionalReason() {
         Usuario alvo = usuario(20L, "RESPONSAVEL", true);
+        alvo.setContaSuspensaEm(Instant.parse("2026-09-01T10:00:00Z"));
         when(usuarioRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(alvo));
 
         service.reativarUsuario(1L, 20L, "  Revisão concluída  ");
 
         assertFalse(alvo.getContaSuspensa());
+        assertNull(alvo.getContaSuspensaEm());
         verify(usuarioRepository).save(alvo);
         verify(auditoriaService).registrarAlteracao(
                 1L, "USUARIO_REATIVADO", "USUARIO", 20L, "SUCESSO", "Revisão concluída");

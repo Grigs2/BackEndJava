@@ -42,6 +42,9 @@ public class Usuario implements Serializable {
     @Column(name = "conta_suspensa")
     private Boolean contaSuspensa;
 
+    @Column(name = "conta_suspensa_em")
+    private Instant contaSuspensaEm;
+
     @Column(name = "termos_aceitos_em")
     private Instant termosAceitosEm;
 
@@ -70,6 +73,7 @@ public class Usuario implements Serializable {
         this.telefone = usuario.getTelefone();
         this.tipoPerfil = usuario.getTipoPerfil();
         this.contaSuspensa = usuario.getContaSuspensa();
+        this.contaSuspensaEm = usuario.getContaSuspensaEm();
         this.enderecoOperacional = usuario.getEnderecoOperacional();
         this.termosAceitosEm = usuario.getTermosAceitosEm();
         this.termosVersao = usuario.getTermosVersao();
