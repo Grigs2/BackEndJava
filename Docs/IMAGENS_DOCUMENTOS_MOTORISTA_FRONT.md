@@ -147,5 +147,5 @@ Sugestão para o front: validar tamanho (1 MB) e tipo (`image/jpeg` ou `image/pn
 
 ## 7. Pendências conhecidas
 
-- Retenção: as imagens serão apagadas 30 dias após a mudança de status do motorista. Isso ainda não está implementado.
+- Retenção: 30 dias após a suspensão da conta, as imagens são apagadas pelo job diário e os documentos afetados voltam para `RECUSADO` com o motivo de reenvio. Reativar antes disso mantém as imagens. Após a purga, o motorista precisa reenviar as imagens antes de iniciar viagens.
 - Limite no proxy: o nginx de produção precisa de `client_max_body_size 2m` (fora deste repositório).

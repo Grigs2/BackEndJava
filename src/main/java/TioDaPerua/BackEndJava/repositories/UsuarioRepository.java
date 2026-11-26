@@ -7,8 +7,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.List;
 
@@ -52,4 +55,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query("SELECT COUNT(usuario) FROM Usuario usuario "
             + "WHERE usuario.tipoPerfil = 'ADMIN' AND COALESCE(usuario.contaSuspensa, false) = false")
     long contarAdministradoresAtivos();
+
+    @Query("SELECT usuario.id FROM Usuario usuario "
+            + "WHERE COALESCE(usuario.contaSuspensa, false) = true AND usuario.contaSuspensaEm <= :limite")
+    List<Long> findIdsSuspensosDesde(@Param("limite") Instant limite);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Usuario usuario SET usuario.contaSuspensaEm = :agora "
+            + "WHERE COALESCE(usuario.contaSuspensa, false) = true AND usuario.contaSuspensaEm IS NULL")
+    int iniciarContagemDeSuspensoesAnteriores(@Param("agora") Instant agora);
 }

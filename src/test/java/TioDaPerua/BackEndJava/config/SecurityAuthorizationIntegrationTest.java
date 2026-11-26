@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "app.security.jwt.secret-base64=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "app.storage.documentos.chave-base64=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "app.admin.bootstrap.enabled=false"
 })
 class SecurityAuthorizationIntegrationTest {

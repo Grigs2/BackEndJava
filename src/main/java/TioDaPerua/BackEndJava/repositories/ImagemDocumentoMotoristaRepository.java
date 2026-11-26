@@ -14,4 +14,6 @@ public interface ImagemDocumentoMotoristaRepository extends JpaRepository<Imagem
     List<ImagemDocumentoMotorista> findByDocumentoIdIn(Collection<Long> documentoIds);
 
     Optional<ImagemDocumentoMotorista> findByDocumentoIdAndLado(Long documentoId, LadoDocumento lado);
+
+    List<ImagemDocumentoMotorista> findByDocumentoMotoristaUsuarioId(Long usuarioId);
 }

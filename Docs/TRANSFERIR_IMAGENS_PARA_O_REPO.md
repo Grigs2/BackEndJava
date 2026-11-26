@@ -1,73 +1,35 @@
-# Ver as imagens dos documentos no VS Code do Codespace
+# Ver as imagens dos documentos no Codespace
 
-As imagens enviadas pelo front ficam no volume Docker `documentos_motorista`, montado em `/var/lib/tiodaperua/documentos`. Essa pasta fica fora do repositório, então não aparece no explorador do VS Code.
-
-Este tutorial copia as imagens para a pasta oculta `.imagens-transferencia/` dentro do repositório, para que possam ser abertas no VS Code. Essa pasta está no `.gitignore`, então não vai para o Git.
+As imagens enviadas pelo front ficam cifradas no volume Docker `documentos_motorista`, montado em `/var/lib/tiodaperua/documentos`. Essa pasta fica fora do repositório, e os arquivos não são legíveis diretamente: copiá-los do disco gera apenas dados cifrados. Para ver uma imagem, use a API, que decifra o arquivo e confere a integridade (SHA-256).
 
 ## Atenção
 
-- As imagens são dados pessoais de motoristas. Não as mova para pastas que não estejam no `.gitignore`.
-- Apague a cópia quando terminar (passo 4).
+- As imagens são dados pessoais de motoristas. Não as salve em pastas versionadas.
+- O volume é zerado quando o container é reconstruído. Os registros de documento continuam no banco, mas o arquivo pode desaparecer.
 
-## Passo 1: abrir o terminal do Codespace
+## Ver uma imagem pela API
 
-No VS Code do Codespace, abra o terminal integrado (`Ctrl+'`). Ele roda dentro do container da aplicação, que tem acesso ao volume.
-
-## Passo 2: copiar as imagens
-
-Rode o bloco abaixo no terminal:
+Como admin, com um access token válido:
 
 ```bash
-SRC=/var/lib/tiodaperua/documentos
-DEST=/workspaces/BackEndJava/.imagens-transferencia
-
-mkdir -p "$DEST"
-find "$SRC" -type f | while read -r f; do
-  if head -c 4 "$f" | od -An -tx1 | grep -q '89 50 4e 47'; then ext=png; else ext=jpg; fi
-  rel=${f#"$SRC"/}
-  mkdir -p "$DEST/$(dirname "$rel")"
-  cp "$f" "$DEST/$rel.$ext"
-done
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/TioDaPerua/api/Admin/Documentos/{idDocumento}/Imagens/FRENTE" -o /tmp/frente.jpg
 ```
 
-O script detecta o formato pela assinatura do arquivo (PNG ou JPEG) e acrescenta a extensão na cópia. Os arquivos originais não são alterados.
+Troque `FRENTE` por `VERSO` ou `UNICA`, conforme o tipo. Cada visualização é registrada na auditoria. Apague o arquivo temporário ao terminar: `rm -f /tmp/frente.jpg`.
 
-A pasta `.imagens-transferencia/` só aparece depois deste passo. Antes de rodar o script, ela não existe no repositório. Se ainda não aparecer no explorador, clique em "Atualizar" (ícone de atualizar na barra do explorador) ou rode `ls -la /workspaces/BackEndJava` para conferir.
+## Validar que o arquivo está cifrado
 
-## Passo 3: abrir a imagem
-
-No explorador do VS Code, abra a pasta `.imagens-transferencia/`. A estrutura é:
-
-```
-.imagens-transferencia/
-└── motoristas/
-    └── {idMotorista}/
-        └── documentos/
-            └── {idDocumento}/
-                ├── FRENTE.jpg
-                └── VERSO.png
-```
-
-Clique no arquivo para abrir o visualizador de imagens.
-
-Para listar só o caminho dos arquivos no terminal:
+Os 12 primeiros bytes são o IV e não seguem a assinatura de JPEG (`FF D8 FF`) nem de PNG (`89 50 4E 47`). Para conferir, rode no terminal do Codespace (container da aplicação):
 
 ```bash
-find /workspaces/BackEndJava/.imagens-transferencia -type f
+find /var/lib/tiodaperua/documentos -type f | head -n 1 | xargs -I{} sh -c 'od -An -tx1 -N16 "{}"'
 ```
 
-## Passo 4: apagar a cópia
+A saída não deve começar com `ff d8 ff` nem com `89 50 4e 47`. Para comparar com o original, envie uma imagem de teste e confirme que `curl` (acima) devolve a imagem legível, enquanto o arquivo em disco não é.
 
-Quando terminar, remova a pasta de transferência:
+## Apagar a cópia temporária
 
 ```bash
-rm -rf /workspaces/BackEndJava/.imagens-transferencia
+rm -f /tmp/frente.jpg
 ```
-
-## Conferir que a pasta está ignorada pelo Git
-
-```bash
-cd /workspaces/BackEndJava && git check-ignore -v .imagens-transferencia/
-```
-
-A saída deve mostrar a regra `.gitignore` com `.imagens-transferencia/`. Se não mostrar nada, não copie as imagens e avise o time.
