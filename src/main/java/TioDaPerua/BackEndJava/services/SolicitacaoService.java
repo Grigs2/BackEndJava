@@ -276,8 +276,16 @@ public class SolicitacaoService {
     /** Solicitações em aberto das viagens do motorista (convites enviados e pedidos recebidos). */
     @Transactional
     public List<Solicitacao> listarDoMotorista(Long idMotorista) {
+        return listarDoMotorista(idMotorista, false);
+    }
+
+    /** Com {@code todas}, inclui também os vínculos ativos e os encerrados (recusados, expirados e transportes encerrados). */
+    @Transactional
+    public List<Solicitacao> listarDoMotorista(Long idMotorista, boolean todas) {
         expirarVencidas();
-        return solicitacaoRepository.findAbertasByMotoristaId(idMotorista);
+        return todas
+                ? solicitacaoRepository.findTodasByMotoristaId(idMotorista)
+                : solicitacaoRepository.findAbertasByMotoristaId(idMotorista);
     }
 
     /** Marca como EXPIRADA as solicitações sem resposta cujo prazo de 3 dias já passou. */

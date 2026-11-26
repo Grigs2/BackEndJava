@@ -128,4 +128,19 @@ class ViagemHorarioPartidaTest {
         assertEquals(LocalTime.of(7, 0), viagem.getHorarioPartidaPadrao());
         verify(viagemRepository, never()).save(any());
     }
+
+    @Test
+    void renamingIsAllowedEvenWhenTodaysExecutionAlreadyStarted() {
+        Viagem viagem = new Viagem();
+        viagem.setId(9L);
+        viagem.setAtivo(true);
+        viagem.setPeriodo(Periodo.MANHA_IDA);
+        when(viagemRepository.findById(9L)).thenReturn(Optional.of(viagem));
+        when(viagemRepository.save(viagem)).thenReturn(viagem);
+
+        Viagem salva = service.atualizarNome(9L, "Rota da Vila");
+
+        assertEquals("Rota da Vila", salva.getNome());
+        verify(viagemDiaRepository, never()).findByViagemIdAndData(any(), any());
+    }
 }

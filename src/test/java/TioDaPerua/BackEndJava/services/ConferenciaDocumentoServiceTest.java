@@ -27,6 +27,22 @@ class ConferenciaDocumentoServiceTest {
     }
 
     @Test
+    void aprovacaoExigeAsImagensObrigatorias() {
+        var frente = new TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO(1L, TioDaPerua.BackEndJava.enums.LadoDocumento.FRENTE, "image/jpeg", 10L, null);
+        var verso = new TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO(1L, TioDaPerua.BackEndJava.enums.LadoDocumento.VERSO, "image/jpeg", 10L, null);
+        var unica = new TioDaPerua.BackEndJava.DTOs.ImagemDocumentoDTO(2L, TioDaPerua.BackEndJava.enums.LadoDocumento.UNICA, "image/jpeg", 10L, null);
+
+        assertTrue(ConferenciaDocumentoService.imagensObrigatoriasEnviadas(TipoDocumento.CNH, List.of(frente, verso)));
+        assertFalse(ConferenciaDocumentoService.imagensObrigatoriasEnviadas(TipoDocumento.CNH, List.of(frente)));
+        assertFalse(ConferenciaDocumentoService.imagensObrigatoriasEnviadas(TipoDocumento.VISTORIA, List.of()));
+        assertTrue(ConferenciaDocumentoService.imagensObrigatoriasEnviadas(TipoDocumento.VISTORIA, List.of(unica)));
+
+        DocumentoMotorista semFotos = documento(TipoDocumento.CNH, "12345678900", "D", HOJE.plusYears(2));
+        assertFalse(ConferenciaDocumentoService.paraRevisao(semFotos, List.of(frente)).podeAprovar());
+        assertTrue(ConferenciaDocumentoService.paraRevisao(semFotos, List.of(frente, verso)).podeAprovar());
+    }
+
+    @Test
     void digitoDoRenavam() {
         // Base 0123456789 invertida × pesos 2,3,4,5,6,7,8,9,2,3 = 202; 2020 mod 11 = 7.
         assertTrue(ConferenciaDocumentoService.renavamValido("01234567897"));

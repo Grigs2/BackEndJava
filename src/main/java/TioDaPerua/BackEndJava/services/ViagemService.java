@@ -1195,12 +1195,14 @@ public class ViagemService {
         return viagemRepository.save(viagem);
     }
 
-    /** Edita o nome da viagem; vazio volta ao nome padrão de ida/volta. */
+    /**
+     * Edita o nome da viagem; vazio volta ao nome padrão de ida/volta. O nome não altera o itinerário,
+     * por isso pode ser trocado mesmo com a viagem de hoje iniciada ou encerrada.
+     */
     @Transactional
     public Viagem atualizarNome(Long idViagem, String nome) {
         Viagem viagem = viagemRepository.findById(idViagem)
                 .orElseThrow(() -> new ResourceNotFoundException("Viagem não encontrada com id: " + idViagem));
-        validarViagemNaoIniciadaHoje(idViagem);
         viagem.setNome(nome);
         return viagemRepository.save(viagem);
     }

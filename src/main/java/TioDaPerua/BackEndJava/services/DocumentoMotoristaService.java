@@ -228,6 +228,9 @@ public class DocumentoMotoristaService {
         switch (dto.tipo()) {
             case CNH -> {
                 exigirNumeroOnzeDigitos(dto.numero(), "O número da CNH deve conter 11 dígitos");
+                if (!ConferenciaDocumentoService.cnhValida(dto.numero())) {
+                    throw new BusinessException("Número da CNH inválido: os dígitos verificadores não conferem");
+                }
                 exigirTexto(dto.categoria(), "A categoria da CNH é obrigatória");
             }
             case VISTORIA -> {
@@ -241,7 +244,12 @@ public class DocumentoMotoristaService {
                     throw new BusinessException("A validade da vistoria não pode anteceder sua realização");
                 }
             }
-            case LICENCIAMENTO -> exigirNumeroOnzeDigitos(dto.numero(), "O RENAVAM deve conter 11 dígitos");
+            case LICENCIAMENTO -> {
+                exigirNumeroOnzeDigitos(dto.numero(), "O RENAVAM deve conter 11 dígitos");
+                if (!ConferenciaDocumentoService.renavamValido(dto.numero())) {
+                    throw new BusinessException("RENAVAM inválido: o dígito verificador não confere");
+                }
+            }
         }
     }
 
